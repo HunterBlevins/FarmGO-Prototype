@@ -1,0 +1,965 @@
+/* ============================================================
+   GLOBAL
+   ============================================================ */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+
+  font-family:
+    Inter,
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    sans-serif;
+
+  color: #222;
+  background: #f4f5f6;
+}
+
+body.resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+
+/* ============================================================
+   TOP BAR
+   ============================================================ */
+
+#topbar {
+  height: 64px;
+
+  background: #fff;
+
+  border-bottom:
+    1px solid #d8dadd;
+
+  display: flex;
+  align-items: center;
+
+  padding: 0 18px;
+
+  position: relative;
+  z-index: 10;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand img {
+  width: 128px;
+  height: 58px;
+
+  object-fit: contain;
+}
+
+.brand h1 {
+  margin: 0;
+
+  font-size: 20px;
+  line-height: 1.1;
+
+  font-weight: 650;
+}
+
+#appSubtitle {
+  margin-top: 3px;
+
+  color: #667;
+
+  font-size: 12px;
+}
+
+
+/* ============================================================
+   MAIN APPLICATION
+   ============================================================ */
+
+#app {
+  width: 100%;
+  height: calc(100vh - 64px);
+
+  display: flex;
+
+  overflow: hidden;
+}
+
+
+/* ============================================================
+   SIDE PANELS
+   ============================================================ */
+
+.side-panel {
+  position: relative;
+
+  background: #fff;
+
+  overflow-y: auto;
+  overflow-x: hidden;
+
+  z-index: 5;
+}
+
+
+/* ============================================================
+   LEFT PANEL
+   ============================================================ */
+
+#leftPanel {
+  width: 320px;
+
+  min-width: 240px;
+  max-width: 45vw;
+
+  flex-shrink: 0;
+
+  border-right:
+    1px solid #d8dadd;
+}
+
+
+/* ============================================================
+   MAP
+   ============================================================ */
+
+#mapContainer {
+  flex: 1;
+
+  min-width: 300px;
+
+  position: relative;
+
+  overflow: hidden;
+}
+
+#viewDiv,
+#viewDiv:focus {
+  width: 100%;
+  height: 100%;
+
+  outline: none;
+}
+
+
+/* ============================================================
+   RIGHT PANEL
+   ============================================================ */
+
+.right-panel {
+  position: relative;
+
+  width: 420px;
+
+  min-width: 320px;
+
+  max-width: 65vw;
+
+  flex-shrink: 0;
+
+  border-left:
+    1px solid #d8dadd;
+
+  background: #fff;
+
+  overflow-y: auto;
+}
+
+
+/* ============================================================
+   RESIZE HANDLES
+   ============================================================ */
+
+.resize-handle {
+  position: absolute;
+
+  top: 0;
+  bottom: 0;
+
+  width: 7px;
+
+  cursor: col-resize;
+
+  z-index: 50;
+}
+
+
+/* Left panel handle */
+
+#leftResizeHandle {
+  right: 0;
+}
+
+
+/* Right panel handle */
+
+#rightResizeHandle {
+  left: 0;
+}
+
+
+/* Hover */
+
+.resize-handle:hover {
+  background:
+    rgba(0, 0, 0, 0.12);
+}
+
+
+/* ============================================================
+   PANELS
+   ============================================================ */
+
+.panel-section {
+  padding: 18px;
+
+  border-bottom:
+    1px solid #e2e3e5;
+}
+
+.panel-section h2 {
+  margin: 0 0 14px;
+
+  font-size: 15px;
+
+  font-weight: 650;
+}
+
+.panel-section label {
+  display: block;
+
+  margin: 0 0 6px;
+
+  color: #555;
+
+  font-size: 12px;
+
+  font-weight: 600;
+}
+
+
+/* ============================================================
+   DROPDOWNS
+   ============================================================ */
+
+select {
+  width: 100%;
+  height: 36px;
+
+  margin-bottom: 14px;
+
+  padding: 0 10px;
+
+  border:
+    1px solid #c9ccd0;
+
+  border-radius: 5px;
+
+  background: #fff;
+
+  color: #222;
+
+  font: inherit;
+
+  font-size: 13px;
+}
+
+select:disabled {
+  color: #999;
+
+  background: #f4f4f4;
+}
+
+
+/* ============================================================
+   FIELD TRANSPARENCY
+   ============================================================ */
+
+.field-opacity-control {
+  margin-top: 0;
+  margin-bottom: 2px;
+}
+
+.opacity-header {
+  display: flex;
+
+  justify-content: space-between;
+  align-items: center;
+
+  margin-bottom: 6px;
+
+  color: #555;
+
+  font-size: 12px;
+
+  font-weight: 600;
+}
+
+#fieldTransparencyValue {
+  color: #777;
+
+  font-weight: 500;
+}
+
+.opacity-slider {
+  width: 100%;
+
+  margin: 0;
+  padding: 0;
+
+  cursor: pointer;
+}
+
+.opacity-labels {
+  display: flex;
+
+  justify-content: space-between;
+
+  margin-top: 3px;
+
+  color: #888;
+
+  font-size: 10px;
+}
+
+
+/* ============================================================
+   RASTER LIST
+   ============================================================ */
+
+.layer-list {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 8px;
+}
+
+.layer-option {
+  display: flex !important;
+
+  align-items: flex-start;
+
+  gap: 9px;
+
+  padding: 9px;
+
+  border:
+    1px solid #dedfe1;
+
+  border-radius: 6px;
+
+  cursor: pointer;
+
+  background: #fff;
+}
+
+.layer-option:hover {
+  background: #f7f8f8;
+}
+
+.layer-option input {
+  margin-top: 2px;
+}
+
+.layer-option strong {
+  display: block;
+
+  font-size: 13px;
+
+  font-weight: 600;
+}
+
+.layer-option small {
+  display: block;
+
+  margin-top: 3px;
+
+  color: #777;
+
+  font-size: 11px;
+
+  line-height: 1.35;
+}
+
+
+/* ============================================================
+   LEGEND
+   ============================================================ */
+
+.legend-container {
+  min-height: 50px;
+}
+
+.esri-legend {
+  background: transparent !important;
+
+  box-shadow: none !important;
+
+  padding: 0 !important;
+}
+
+
+/* ============================================================
+   COUNTY REPORT
+   ============================================================ */
+
+.report-content {
+  width: 100%;
+
+  font-size: 13px;
+
+  line-height: 1.5;
+}
+
+.county-report {
+  width: 100%;
+
+  box-sizing: border-box;
+}
+
+
+/* ============================================================
+   REPORT HEADER
+   ============================================================ */
+
+.report-header {
+  margin-bottom: 20px;
+
+  padding-bottom: 15px;
+
+  border-bottom:
+    1px solid rgba(0, 0, 0, 0.12);
+}
+
+.report-county {
+  margin: 0;
+
+  font-size: 26px;
+
+  font-weight: 700;
+
+  line-height: 1.2;
+}
+
+.report-id {
+  margin-top: 6px;
+
+  font-size: 14px;
+
+  color: #666;
+}
+
+
+/* ============================================================
+   REPORT SECTIONS
+   ============================================================ */
+
+.report-section {
+  width: 100%;
+
+  margin-bottom: 24px;
+}
+
+.report-section h4 {
+  margin: 0 0 10px;
+
+  font-size: 17px;
+
+  font-weight: 700;
+}
+
+
+/* ============================================================
+   REPORT CHART
+   ============================================================ */
+
+.report-chart {
+  width: 100%;
+
+  min-width: 0;
+
+  margin-top: 12px;
+}
+
+
+/* ============================================================
+   CHART CARD
+   ============================================================ */
+
+.report-chart-card {
+  width: 100%;
+
+  min-width: 0;
+
+  box-sizing: border-box;
+
+  padding: 18px;
+
+  border-radius: 12px;
+
+  background:
+    rgba(255, 255, 255, 0.97);
+
+  border:
+    1px solid rgba(0, 0, 0, 0.10);
+
+  box-shadow:
+    0 3px 12px rgba(0, 0, 0, 0.08);
+}
+
+
+/* ============================================================
+   CHART HEADER
+   ============================================================ */
+
+.report-chart-header {
+  display: flex;
+
+  align-items: flex-start;
+
+  justify-content: space-between;
+
+  gap: 12px;
+
+  margin-bottom: 12px;
+}
+
+.report-chart-title {
+  font-size: 20px;
+
+  font-weight: 700;
+
+  line-height: 1.25;
+}
+
+.report-chart-subtitle {
+  margin-top: 5px;
+
+  font-size: 14px;
+
+  color: #666;
+
+  line-height: 1.4;
+}
+
+
+/* ============================================================
+   CHART SVG
+   ============================================================ */
+
+.report-chart-svg-wrapper {
+  width: 100%;
+
+  height: 320px;
+
+  overflow: hidden;
+}
+
+.report-chart-svg {
+  display: block;
+
+  width: 100%;
+
+  height: 100%;
+}
+
+
+/* ============================================================
+   CHART GRID
+   ============================================================ */
+
+.chart-grid-line {
+  stroke:
+    rgba(0, 0, 0, 0.10);
+
+  stroke-width: 1;
+}
+
+.chart-axis {
+  stroke:
+    rgba(0, 0, 0, 0.45);
+
+  stroke-width: 2;
+}
+
+
+/* ============================================================
+   CHART LABELS
+   ============================================================ */
+
+.chart-axis-label {
+  font-size: 17px;
+
+  fill: #444;
+
+  font-family:
+    Arial,
+    Helvetica,
+    sans-serif;
+}
+
+
+/* ============================================================
+   GENERIC CHART LINE
+   ============================================================ */
+
+.chart-line {
+  stroke: #2563eb;
+
+  stroke-width: 4;
+
+  stroke-linejoin: round;
+
+  stroke-linecap: round;
+
+  fill: none;
+}
+
+
+/* ============================================================
+   GENERIC CHART POINTS
+   ============================================================ */
+
+.chart-point {
+  fill: #2563eb;
+
+  stroke: white;
+
+  stroke-width: 2;
+}
+
+
+/* ============================================================
+   TEMPERATURE CHART LINES
+   ============================================================ */
+
+/* Minimum — blue */
+
+.chart-line-temperature-min {
+  stroke: #2563eb;
+
+  stroke-width: 4;
+
+  stroke-linejoin: round;
+
+  stroke-linecap: round;
+
+  fill: none;
+}
+
+
+/* Mean — orange */
+
+.chart-line-temperature-mean {
+  stroke: #f59e0b;
+
+  stroke-width: 4;
+
+  stroke-linejoin: round;
+
+  stroke-linecap: round;
+
+  fill: none;
+}
+
+
+/* Maximum — red */
+
+.chart-line-temperature-max {
+  stroke: #dc2626;
+
+  stroke-width: 4;
+
+  stroke-linejoin: round;
+
+  stroke-linecap: round;
+
+  fill: none;
+}
+
+
+/* ============================================================
+   TEMPERATURE CHART POINTS
+   ============================================================ */
+
+/* Minimum — blue */
+
+.chart-point-temperature-min {
+  fill: #2563eb;
+
+  stroke: white;
+
+  stroke-width: 2;
+}
+
+
+/* Mean — orange */
+
+.chart-point-temperature-mean {
+  fill: #f59e0b;
+
+  stroke: white;
+
+  stroke-width: 2;
+}
+
+
+/* Maximum — red */
+
+.chart-point-temperature-max {
+  fill: #dc2626;
+
+  stroke: white;
+
+  stroke-width: 2;
+}
+
+
+/* ============================================================
+   TEMPERATURE LEGEND
+   ============================================================ */
+
+.temperature-legend {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 5px;
+
+  font-size: 13px;
+
+  white-space: nowrap;
+}
+
+.temperature-legend-item {
+  display: flex;
+
+  align-items: center;
+
+  gap: 6px;
+}
+
+.temperature-legend-marker {
+  display: inline-block;
+
+  width: 12px;
+  height: 12px;
+
+  border-radius: 50%;
+
+  flex-shrink: 0;
+}
+
+
+/* Minimum */
+
+.temperature-legend-min {
+  background: #2563eb;
+}
+
+
+/* Mean */
+
+.temperature-legend-mean {
+  background: #f59e0b;
+}
+
+
+/* Maximum */
+
+.temperature-legend-max {
+  background: #dc2626;
+}
+
+
+/* ============================================================
+   NO DATA
+   ============================================================ */
+
+.report-no-data {
+  padding: 25px;
+
+  text-align: center;
+
+  font-size: 15px;
+
+  color: #666;
+}
+
+
+/* ============================================================
+   FIELD ATTRIBUTES
+   ============================================================ */
+
+.section-heading-row {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 10px;
+}
+
+.section-heading-row h2 {
+  margin-bottom: 14px;
+}
+
+#clearFieldButton {
+  border:
+    1px solid #c9ccd0;
+
+  border-radius: 5px;
+
+  background: #fff;
+
+  padding: 5px 9px;
+
+  cursor: pointer;
+
+  font-size: 11px;
+}
+
+#clearFieldButton:hover {
+  background: #f3f4f5;
+}
+
+.attribute-container {
+  border:
+    1px solid #e0e1e3;
+
+  border-radius: 6px;
+
+  overflow: hidden;
+}
+
+.attribute-row {
+  padding: 9px 10px;
+
+  border-bottom:
+    1px solid #e7e8ea;
+}
+
+.attribute-row:last-child {
+  border-bottom: 0;
+}
+
+.attribute-name {
+  color: #666;
+
+  font-size: 10px;
+
+  font-weight: 700;
+
+  text-transform: uppercase;
+
+  letter-spacing: 0.03em;
+}
+
+.attribute-value {
+  margin-top: 2px;
+
+  font-size: 12px;
+
+  overflow-wrap: anywhere;
+}
+
+
+/* ============================================================
+   EMPTY / LOADING
+   ============================================================ */
+
+.empty-state,
+.loading-state {
+  color: #777;
+
+  font-size: 12px;
+
+  line-height: 1.5;
+}
+
+
+/* ============================================================
+   MAP CONTROLS
+   ============================================================ */
+
+#mapControls {
+  position: absolute;
+
+  top: 16px;
+  right: 16px;
+
+  z-index: 1000;
+
+  display: flex;
+
+  flex-direction: column;
+
+  align-items: flex-end;
+
+  gap: 8px;
+
+  pointer-events: none;
+}
+
+#mapControls arcgis-search,
+#mapControls arcgis-compass {
+  display: block;
+
+  pointer-events: auto;
+}
+
+#mapSearch {
+  width: 320px;
+}
+
+#mapCompass {
+  width: auto;
+  height: auto;
+}
+
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+
+@media (max-width: 900px) {
+
+  #app {
+    position: relative;
+  }
+
+  .right-panel {
+    display: none;
+  }
+
+  #leftPanel {
+    width: 280px;
+  }
+
+}
+
+
+/* ============================================================
+   VERY NARROW RIGHT PANEL
+   ============================================================ */
+
+@media (max-width: 1200px) {
+
+  .right-panel {
+    min-width: 300px;
+  }
+
+}

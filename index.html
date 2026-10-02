@@ -1,0 +1,362 @@
+<!doctype html>
+<html lang="en">
+
+  <head>
+
+    <meta charset="UTF-8" />
+
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0"
+    />
+
+    <title>
+      FarmGO
+    </title>
+
+  </head>
+
+
+  <body>
+
+    <!-- =====================================================
+         TOP BAR
+         ===================================================== -->
+
+    <header id="topbar">
+
+      <div class="brand">
+
+        <img
+          id="logo"
+          src="/FarmGOLogo.png"
+          alt="FarmGO logo"
+        />
+
+        <div>
+
+          <h1 id="appTitle">
+            FarmGO
+          </h1>
+
+          <div id="appSubtitle">
+            Agricultural data dashboard
+          </div>
+
+        </div>
+
+      </div>
+
+    </header>
+
+
+    <!-- =====================================================
+         APPLICATION
+         ===================================================== -->
+
+    <main id="app">
+
+
+      <!-- ===================================================
+           LEFT PANEL
+           =================================================== -->
+
+      <aside
+        id="leftPanel"
+        class="side-panel"
+      >
+
+        <div
+          class="resize-handle"
+          id="leftResizeHandle"
+          title="Drag to resize"
+        ></div>
+
+
+        <!-- ================================================
+             LOCATION + FIELD LAYER
+             ================================================ -->
+
+        <section class="panel-section">
+
+          <h2>
+            Location
+          </h2>
+
+
+          <label for="stateSelect">
+            State
+          </label>
+
+
+          <select id="stateSelect">
+
+            <option value="">
+              Select a state...
+            </option>
+
+          </select>
+
+
+          <label for="countySelect">
+            County
+          </label>
+
+
+          <select
+            id="countySelect"
+            disabled
+          >
+
+            <option value="">
+              Select a county...
+            </option>
+
+          </select>
+
+
+          <!-- ==============================================
+               FIELD LAYER
+               ============================================== -->
+
+          <label for="fieldLayerSelect">
+            Field Layer
+          </label>
+
+
+          <select id="fieldLayerSelect">
+
+            <option value="">
+              Select a field layer...
+            </option>
+
+          </select>
+
+
+          <!-- ==============================================
+               FIELD TRANSPARENCY
+               ============================================== -->
+
+          <div
+            id="fieldOpacityControl"
+            class="field-opacity-control"
+          >
+
+            <div class="opacity-header">
+
+              <span>
+                Transparency
+              </span>
+
+              <span id="fieldTransparencyValue">
+                15%
+              </span>
+
+            </div>
+
+
+            <input
+              type="range"
+              id="fieldOpacitySlider"
+              class="opacity-slider"
+              min="0"
+              max="100"
+              step="1"
+              value="15"
+            />
+
+
+            <div class="opacity-labels">
+
+              <span>
+                Opaque
+              </span>
+
+              <span>
+                Transparent
+              </span>
+
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- ================================================
+             RASTERS
+             ================================================ -->
+
+        <section class="panel-section">
+
+          <h2>
+            Raster Datasets
+          </h2>
+
+
+          <div
+            id="rasterList"
+            class="layer-list"
+          ></div>
+
+        </section>
+
+
+        <!-- ================================================
+             LEGEND
+             ================================================ -->
+
+        <section class="panel-section">
+
+          <h2>
+            Legend
+          </h2>
+
+
+          <div
+            id="legendDiv"
+            class="legend-container"
+          >
+
+            <div class="empty-state">
+              Select a raster layer.
+            </div>
+
+          </div>
+
+        </section>
+
+      </aside>
+
+
+      <!-- ===================================================
+           MAP
+           =================================================== -->
+
+      <section id="mapContainer">
+
+        <div id="viewDiv"></div>
+
+
+        <!-- ================================================
+             MAP CONTROLS
+             ================================================ -->
+
+        <div id="mapControls">
+
+          <arcgis-search
+            id="mapSearch"
+          ></arcgis-search>
+
+
+          <arcgis-compass
+            id="mapCompass"
+          ></arcgis-compass>
+
+        </div>
+
+      </section>
+
+
+      <!-- ===================================================
+           RIGHT PANEL
+           =================================================== -->
+
+      <aside
+        id="rightPanel"
+        class="side-panel right-panel"
+      >
+
+        <!-- ================================================
+             RIGHT PANEL RESIZE HANDLE
+             ================================================ -->
+
+        <div
+          class="resize-handle right-resize-handle"
+          id="rightResizeHandle"
+          title="Drag to resize"
+        ></div>
+
+
+        <!-- ================================================
+             COUNTY REPORT
+             ================================================ -->
+
+        <section class="panel-section">
+
+          <h2>
+            County Report
+          </h2>
+
+
+          <div
+            id="countyReport"
+            class="report-content"
+          >
+
+            <div class="empty-state">
+              Select a county to view its report.
+            </div>
+
+          </div>
+
+        </section>
+
+
+        <!-- ================================================
+             FIELD ATTRIBUTES
+             ================================================ -->
+
+        <section
+          class="panel-section field-info-section"
+        >
+
+          <div
+            class="section-heading-row"
+          >
+
+            <h2>
+              Selected Field
+            </h2>
+
+
+            <button
+              id="clearFieldButton"
+              type="button"
+            >
+              Clear
+            </button>
+
+          </div>
+
+
+          <div
+            id="fieldAttributes"
+            class="attribute-container"
+          >
+
+            <div class="empty-state">
+              Click a field on the map to view its attributes.
+            </div>
+
+          </div>
+
+        </section>
+
+      </aside>
+
+    </main>
+
+
+    <!-- =====================================================
+         APPLICATION SCRIPT
+         ===================================================== -->
+
+    <script
+      type="module"
+      src="/src/main.js"
+    ></script>
+
+  </body>
+
+</html>
