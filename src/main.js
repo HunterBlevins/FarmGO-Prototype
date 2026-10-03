@@ -1,10 +1,10 @@
+import "./style.css";
+
 import { createMap } from "./map.js";
-
 import { appState } from "./state.js";
-
-import {
-  initializeUI,
-} from "./ui.js";
+import { CONFIG } from "./config.js";
+import { initializeUI } from "./ui.js";
+import { makePanelResizable } from "./panelResize.js";
 
 import {
   initializeGeography,
@@ -13,7 +13,7 @@ import {
 } from "./geography.js";
 
 import {
-  setActiveRaster,
+  setRasterVisibility,
   setRasterOpacity,
 } from "./rasters.js";
 
@@ -24,181 +24,6 @@ import {
   clearFieldSelection,
 } from "./fields.js";
 
-import "./style.css";
-
-
-// ============================================================
-// RIGHT PANEL RESIZING
-// ============================================================
-
-function initializeRightPanelResize() {
-
-  const rightPanel =
-    document.getElementById(
-      "rightPanel"
-    );
-
-  const resizeHandle =
-    document.getElementById(
-      "rightResizeHandle"
-    );
-
-
-  // ----------------------------------------------------------
-  // MAKE SURE BOTH ELEMENTS EXIST
-  // ----------------------------------------------------------
-
-  if (
-    !rightPanel ||
-    !resizeHandle
-  ) {
-
-    console.warn(
-      "Right panel resize elements not found."
-    );
-
-    return;
-
-  }
-
-
-  let isResizing = false;
-
-
-  // ----------------------------------------------------------
-  // START RESIZING
-  // ----------------------------------------------------------
-
-  resizeHandle.addEventListener(
-    "mousedown",
-    (event) => {
-
-      event.preventDefault();
-
-      isResizing = true;
-
-      document.body.classList.add(
-        "resizing"
-      );
-
-    }
-  );
-
-
-  // ----------------------------------------------------------
-  // RESIZE WHILE DRAGGING
-  // ----------------------------------------------------------
-
-  document.addEventListener(
-    "mousemove",
-    (event) => {
-
-      if (!isResizing) {
-
-        return;
-
-      }
-
-
-      const windowWidth =
-        window.innerWidth;
-
-
-      const mouseX =
-        event.clientX;
-
-
-      // ------------------------------------------------------
-      // CALCULATE NEW WIDTH
-      //
-      // The right panel begins at mouseX and extends to the
-      // right edge of the browser.
-      // ------------------------------------------------------
-
-      const newWidth =
-        windowWidth - mouseX;
-
-
-      // ------------------------------------------------------
-      // LIMITS
-      // ------------------------------------------------------
-
-      const minWidth =
-        280;
-
-      const maxWidth =
-        Math.min(
-          windowWidth * 0.55,
-          800
-        );
-
-
-      const clampedWidth =
-        Math.max(
-          minWidth,
-          Math.min(
-            newWidth,
-            maxWidth
-          )
-        );
-
-
-      // ------------------------------------------------------
-      // APPLY WIDTH
-      // ------------------------------------------------------
-
-      rightPanel.style.width =
-        `${clampedWidth}px`;
-
-    }
-  );
-
-
-  // ----------------------------------------------------------
-  // STOP RESIZING
-  // ----------------------------------------------------------
-
-  document.addEventListener(
-    "mouseup",
-    () => {
-
-      if (!isResizing) {
-
-        return;
-
-      }
-
-
-      isResizing = false;
-
-      document.body.classList.remove(
-        "resizing"
-      );
-
-    }
-  );
-
-
-  // ----------------------------------------------------------
-  // PREVENT TEXT SELECTION WHILE DRAGGING
-  // ----------------------------------------------------------
-
-  resizeHandle.addEventListener(
-    "dragstart",
-    (event) => {
-
-      event.preventDefault();
-
-    }
-  );
-
-
-  console.log(
-    "Right panel resizing initialized."
-  );
-
-}
-
 
 // ============================================================
 // APPLICATION STARTUP
@@ -206,107 +31,52 @@ function initializeRightPanelResize() {
 
 async function main() {
 
-  // ----------------------------------------------------------
-  // CREATE MAP
-  // ----------------------------------------------------------
+  document.title = CONFIG.app.title;
 
-  const {
-    map,
-    view,
-  } = createMap();
+  // Map
+  const { map, view } = createMap();
 
+  appState.map = map;
+  appState.view = view;
 
-  appState.map =
-    map;
-
-  appState.view =
-    view;
-
-
-  // ----------------------------------------------------------
-  // INITIALIZE UI
-  // ----------------------------------------------------------
-
+  // UI
   initializeUI({
-
-    onStateChange:
-      selectState,
-
-    onCountyChange:
-      selectCounty,
-
-    onRasterChange:
-      setActiveRaster,
-
-    onRasterOpacityChange:
-      setRasterOpacity,
-
-    onFieldLayerChange:
-      setActiveFieldLayer,
-
-    onFieldOpacityChange:
-      setActiveFieldOpacity,
-
-    onClearFieldSelection:
-      clearFieldSelection,
-
+    onStateChange: selectState,
+    onCountyChange: selectCounty,
+    onRasterChange: setRasterVisibility,
+    onRasterOpacityChange: setRasterOpacity,
+    onFieldLayerChange: setActiveFieldLayer,
+    onFieldOpacityChange: setActiveFieldOpacity,
+    onClearFieldSelection: clearFieldSelection,
   });
 
-
-  // ----------------------------------------------------------
-  // FIELD CLICK HANDLING
-  // ----------------------------------------------------------
-
+  // Map interaction
   initializeFieldClick();
 
+  // Resizable panels
+  makePanelResizable({
+    panelId: "leftPanel",
+    handleId: "leftResizeHandle",
+    side: "left",
+    minWidth: 240,
+    maxWidth: 600,
+    maxFraction: 0.45,
+  });
 
-  // ----------------------------------------------------------
-  // RIGHT PANEL RESIZE
-  // ----------------------------------------------------------
+  makePanelResizable({
+    panelId: "rightPanel",
+    handleId: "rightResizeHandle",
+    side: "right",
+    minWidth: 280,
+    maxWidth: 800,
+    maxFraction: 0.55,
+  });
 
-  initializeRightPanelResize();
-
-
-  // ----------------------------------------------------------
-  // INITIALIZE GEOGRAPHY
-  // ----------------------------------------------------------
-
-  try {
-
-    await initializeGeography();
-
-  } catch (error) {
-
-    console.error(
-      "Geography initialization failed:",
-      error
-    );
-
-  }
-
-
-  // ----------------------------------------------------------
-  // APPLICATION READY
-  // ----------------------------------------------------------
-
-  console.log(
-    "Fields Faster initialized."
-  );
-
+  // Geography (fills the state dropdown)
+  await initializeGeography();
 }
 
 
-// ============================================================
-// START APPLICATION
-// ============================================================
-
-main().catch(
-  (error) => {
-
-    console.error(
-      "Fields Faster failed to initialize:",
-      error
-    );
-
-  }
-);
+main().catch((error) => {
+  console.error(`${CONFIG.app.title} failed to initialize:`, error);
+});

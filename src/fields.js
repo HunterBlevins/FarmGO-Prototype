@@ -1,8 +1,8 @@
 import FeatureLayer from "@arcgis/core/layers/FeatureLayer.js";
 
 import { CONFIG } from "./config.js";
-
 import { appState } from "./state.js";
+import { clamp, createLatestGuard, isConfiguredUrl } from "./utils.js";
 
 import {
   renderFieldLayerList,
@@ -15,145 +15,50 @@ import {
 // SELECTED FIELD HIGHLIGHT
 // ============================================================
 //
-// ArcGIS returns a highlight handle when we call:
-//
-// layerView.highlight(graphic)
-//
-// We keep that handle here so we can remove the previous
-// highlight before highlighting another field.
+// layerView.highlight(graphic) returns a handle. We keep it so
+// the previous highlight can be removed before highlighting
+// another field.
 //
 
 let selectedFieldHighlight = null;
+
+// Only the most recent click is allowed to finish.
+const clickGuard = createLatestGuard();
 
 
 // ============================================================
 // LOAD FIELDS FOR STATE
 // ============================================================
 
-export function loadFieldsForState(
-  stateKey
-) {
-
-  console.log(
-    `Loading field layers for ${stateKey}`
-  );
-
-
-  // ----------------------------------------------------------
-  // REMOVE PREVIOUS FIELD LAYERS
-  // ----------------------------------------------------------
+export function loadFieldsForState(stateKey) {
 
   removeAllFieldLayers();
 
-
-  const stateConfig =
-    CONFIG.states[stateKey];
-
-
-  if (!stateConfig) {
-
-    console.warn(
-      "No field configuration found for:",
-      stateKey
-    );
-
-
-    renderFieldLayerList([]);
-
-
-    return;
-  }
-
-
-  const fields =
-    stateConfig.fields ?? [];
-
-
-  // ----------------------------------------------------------
-  // CREATE FIELD LAYERS
-  // ----------------------------------------------------------
-
-  for (
-    const config
-    of fields
-  ) {
-
-    if (
-      !config.url ||
-      config.url.startsWith("YOUR-")
-    ) {
-
-      console.warn(
-        `Field layer not configured: ${config.title}`
-      );
-
-
-      continue;
-    }
-
-
-    const layer =
-      new FeatureLayer({
-
-        url:
-          config.url,
-
-        outFields:
-          ["*"],
-
-        popupEnabled:
-          false,
-
-        // Nothing turns on automatically.
-
-        visible:
-          false,
-
-        // Default opacity:
-        // 0.85 = 15% transparent.
-
-        opacity:
-          config.opacity !== undefined
-            ? config.opacity
-            : 0.85,
-      });
-
-
-    appState.fieldLayers.set(
-      config.id,
-      layer
-    );
-
-
-    appState.map.add(
-      layer
-    );
-  }
-
-
-  // ----------------------------------------------------------
-  // RENDER FIELD DROPDOWN
-  // ----------------------------------------------------------
-
-  const availableFields =
-    fields.filter(
-      (field) =>
-        field.url &&
-        !field.url.startsWith("YOUR-")
-    );
-
-
-  renderFieldLayerList(
-    availableFields
+  const fields = (CONFIG.states[stateKey]?.fields ?? []).filter(
+    (field) => isConfiguredUrl(field.url)
   );
 
+  for (const config of fields) {
 
-  // ----------------------------------------------------------
-  // DO NOT ACTIVATE FIRST FIELD
-  // ----------------------------------------------------------
-  //
-  // The user must select a field layer.
-  //
+    const layer = new FeatureLayer({
+      url: config.url,
+      title: config.title,
+      outFields: ["*"],
+      popupEnabled: false,
+      visible: false, // nothing turns on automatically
+      opacity: config.opacity ?? CONFIG.defaults.fieldOpacity,
+    });
+
+    appState.fieldLayers.set(config.id, layer);
+    appState.map.add(layer);
+
+    layer.load().catch((error) => {
+      console.error(`Field layer failed to load: ${config.title}`, error);
+    });
+  }
+
+  // The user chooses which field layer to show.
+  renderFieldLayerList(fields);
 }
 
 
@@ -161,133 +66,27 @@ export function loadFieldsForState(
 // SWITCH FIELD LAYER
 // ============================================================
 
-export function setActiveFieldLayer(
-  layerId
-) {
+export function setActiveFieldLayer(layerId) {
 
-  console.log(
-    `Switching field layer to ${layerId}`
-  );
+  clearFieldSelection();
 
+  const selectedLayer = layerId
+    ? appState.fieldLayers.get(layerId)
+    : null;
 
-  // ----------------------------------------------------------
-  // CLEAR EXISTING FIELD HIGHLIGHT
-  // ----------------------------------------------------------
-
-  clearSelectedFieldHighlight();
-
-
-  // ----------------------------------------------------------
-  // IF SELECTION WAS CLEARED
-  // ----------------------------------------------------------
-
-  if (!layerId) {
-
-    for (
-      const layer
-      of appState.fieldLayers.values()
-    ) {
-
-      layer.visible =
-        false;
-    }
-
-
-    appState.activeFieldLayer =
-      null;
-
-
-    appState.activeFieldLayerId =
-      null;
-
-
-    appState.selectedField =
-      null;
-
-
-    renderFieldAttributes(
-      null
-    );
-
-
-    // Reset slider to default:
-    // 15% transparency.
-
-    setFieldOpacityUI(
-      0.85
-    );
-
-
-    return;
+  if (layerId && !selectedLayer) {
+    console.warn("Field layer not found:", layerId);
   }
 
-
-  // ----------------------------------------------------------
-  // FIND SELECTED LAYER
-  // ----------------------------------------------------------
-
-  const selectedLayer =
-    appState.fieldLayers.get(
-      layerId
-    );
-
-
-  if (!selectedLayer) {
-
-    console.warn(
-      "Field layer not found:",
-      layerId
-    );
-
-
-    return;
+  // Show only the selected layer (or none).
+  for (const layer of appState.fieldLayers.values()) {
+    layer.visible = layer === selectedLayer;
   }
 
-
-  // ----------------------------------------------------------
-  // HIDE ALL OTHER FIELD LAYERS
-  // ----------------------------------------------------------
-
-  for (
-    const [
-      id,
-      layer,
-    ]
-    of appState.fieldLayers
-  ) {
-
-    layer.visible =
-      id === layerId;
-  }
-
-
-  // ----------------------------------------------------------
-  // STORE ACTIVE FIELD
-  // ----------------------------------------------------------
-
-  appState.activeFieldLayer =
-    selectedLayer;
-
-
-  appState.activeFieldLayerId =
-    layerId;
-
-
-  appState.selectedField =
-    null;
-
-
-  // ----------------------------------------------------------
-  // UPDATE TRANSPARENCY SLIDER
-  // ----------------------------------------------------------
+  appState.activeFieldLayer = selectedLayer ?? null;
 
   setFieldOpacityUI(
-    selectedLayer.opacity
-  );
-
-
-  renderFieldAttributes(
-    null
+    selectedLayer ? selectedLayer.opacity : CONFIG.defaults.fieldOpacity
   );
 }
 
@@ -296,34 +95,11 @@ export function setActiveFieldLayer(
 // FIELD OPACITY
 // ============================================================
 
-export function setActiveFieldOpacity(
-  opacity
-) {
+export function setActiveFieldOpacity(opacity) {
 
-  const activeLayer =
-    appState.activeFieldLayer;
-
-
-  if (!activeLayer) {
-
-    return;
+  if (appState.activeFieldLayer) {
+    appState.activeFieldLayer.opacity = clamp(Number(opacity), 0, 1);
   }
-
-
-  // Keep opacity safely between 0 and 1.
-
-  const safeOpacity =
-    Math.max(
-      0,
-      Math.min(
-        1,
-        Number(opacity)
-      )
-    );
-
-
-  activeLayer.opacity =
-    safeOpacity;
 }
 
 
@@ -333,55 +109,17 @@ export function setActiveFieldOpacity(
 
 export function removeAllFieldLayers() {
 
-  // ----------------------------------------------------------
-  // REMOVE SELECTED FIELD HIGHLIGHT
-  // ----------------------------------------------------------
+  clearFieldSelection();
 
-  clearSelectedFieldHighlight();
-
-
-  // ----------------------------------------------------------
-  // REMOVE LAYERS FROM MAP
-  // ----------------------------------------------------------
-
-  for (
-    const layer
-    of appState.fieldLayers.values()
-  ) {
-
-    appState.map.remove(
-      layer
-    );
+  for (const layer of appState.fieldLayers.values()) {
+    appState.map.remove(layer);
   }
 
-
   appState.fieldLayers.clear();
+  appState.activeFieldLayer = null;
 
-
-  // ----------------------------------------------------------
-  // CLEAR ACTIVE FIELD STATE
-  // ----------------------------------------------------------
-
-  appState.activeFieldLayer =
-    null;
-
-
-  appState.activeFieldLayerId =
-    null;
-
-
-  appState.selectedField =
-    null;
-
-
-  renderFieldAttributes(
-    null
-  );
-
-
-  setFieldOpacityUI(
-    0.85
-  );
+  renderFieldLayerList([]);
+  setFieldOpacityUI(CONFIG.defaults.fieldOpacity);
 }
 
 
@@ -391,186 +129,81 @@ export function removeAllFieldLayers() {
 
 export function initializeFieldClick() {
 
-  appState.view.on(
-    "click",
-    async (event) => {
+  appState.view.on("click", async (event) => {
 
-      const activeLayer =
-        appState.activeFieldLayer;
+    const activeLayer = appState.activeFieldLayer;
 
+    if (!activeLayer?.visible) {
+      return;
+    }
 
-      // ------------------------------------------------------
-      // NOTHING SELECTED
-      // ------------------------------------------------------
+    const isCurrent = clickGuard.next();
 
-      if (
-        !activeLayer ||
-        !activeLayer.visible
-      ) {
+    try {
 
+      const response = await appState.view.hitTest(event, {
+        include: activeLayer,
+      });
+
+      const result = response.results.find(
+        (item) =>
+          item.type === "graphic" && item.graphic?.layer === activeLayer
+      );
+
+      // Clicking empty map deselects the field.
+      if (!result) {
+        if (isCurrent()) {
+          clearFieldSelection();
+        }
         return;
       }
 
+      // highlight() lives on the layer view, not the layer.
+      const layerView = await appState.view.whenLayerView(activeLayer);
 
-      try {
-
-        // ----------------------------------------------------
-        // HIT TEST ACTIVE FIELD LAYER
-        // ----------------------------------------------------
-
-        const response =
-          await appState.view.hitTest(
-            event,
-            {
-              include:
-                activeLayer,
-            }
-          );
-
-
-        // ----------------------------------------------------
-        // FIND GRAPHIC FROM ACTIVE FIELD LAYER
-        // ----------------------------------------------------
-
-        const result =
-          response.results.find(
-            (item) =>
-              item.type === "graphic" &&
-              item.graphic?.layer ===
-                activeLayer
-          );
-
-
-        // ----------------------------------------------------
-        // NOTHING WAS CLICKED
-        // ----------------------------------------------------
-
-        if (!result) {
-
-          return;
-        }
-
-
-        const graphic =
-          result.graphic;
-
-
-        // ----------------------------------------------------
-        // CLEAR PREVIOUS HIGHLIGHT
-        // ----------------------------------------------------
-
-        clearSelectedFieldHighlight();
-
-
-        // ----------------------------------------------------
-        // STORE SELECTED FIELD
-        // ----------------------------------------------------
-
-        appState.selectedField =
-          graphic;
-
-
-        // ----------------------------------------------------
-        // GET LAYERVIEW
-        // ----------------------------------------------------
-        //
-        // highlight() works on the FeatureLayerView,
-        // not directly on the FeatureLayer.
-        //
-
-        const layerView =
-          await appState.view.whenLayerView(
-            activeLayer
-          );
-
-
-        // ----------------------------------------------------
-        // HIGHLIGHT SELECTED FIELD
-        // ----------------------------------------------------
-
-        selectedFieldHighlight =
-          layerView.highlight(
-            graphic
-          );
-
-
-        // ----------------------------------------------------
-        // SHOW ATTRIBUTES
-        // ----------------------------------------------------
-
-        renderFieldAttributes(
-          graphic.attributes
-        );
-
-
-        console.log(
-          "Selected field:",
-          graphic.attributes
-        );
-
-
-      } catch (error) {
-
-        console.error(
-          "Field click failed:",
-          error
-        );
+      // A newer click (or a layer change) happened while we waited.
+      if (!isCurrent() || appState.activeFieldLayer !== activeLayer) {
+        return;
       }
+
+      const graphic = result.graphic;
+
+      clearSelectedFieldHighlight();
+
+      appState.selectedField = graphic;
+      selectedFieldHighlight = layerView.highlight(graphic);
+
+      renderFieldAttributes(graphic.attributes);
+
+    } catch (error) {
+
+      console.error("Field click failed:", error);
     }
-  );
+  });
 }
 
 
 // ============================================================
-// CLEAR SELECTED FIELD HIGHLIGHT
+// CLEAR SELECTION
 // ============================================================
 
 export function clearSelectedFieldHighlight() {
 
-  if (
-    selectedFieldHighlight
-  ) {
-
-    selectedFieldHighlight.remove();
-
-    selectedFieldHighlight =
-      null;
-  }
+  selectedFieldHighlight?.remove();
+  selectedFieldHighlight = null;
 }
 
-
-// ============================================================
-// CLEAR FIELD SELECTION
-// ============================================================
-//
-// Clears the selected field, removes its highlight, and clears
-// the attributes panel.
-//
-// The active field layer remains visible.
-//
-
+/**
+ * Clears the selected field, its highlight and the attribute
+ * panel. The active field layer stays visible.
+ */
 export function clearFieldSelection() {
 
-  // ----------------------------------------------------------
-  // REMOVE SELECTED FIELD HIGHLIGHT
-  // ----------------------------------------------------------
+  clickGuard.cancel();
 
   clearSelectedFieldHighlight();
 
+  appState.selectedField = null;
 
-  // ----------------------------------------------------------
-  // CLEAR SELECTED FIELD STATE
-  // ----------------------------------------------------------
-
-  appState.selectedField =
-    null;
-
-
-  // ----------------------------------------------------------
-  // CLEAR FIELD ATTRIBUTES
-  // ----------------------------------------------------------
-
-  renderFieldAttributes(
-    null
-  );
+  renderFieldAttributes(null);
 }

@@ -1,401 +1,131 @@
 import { CONFIG } from "./config.js";
+import { escapeHtml } from "./utils.js";
 
 
 // ============================================================
 // CALLBACKS
 // ============================================================
+//
+// main.js hands us the functions to call when the user
+// interacts with the page. This keeps ui.js free of any
+// knowledge about the map.
+//
 
-let rasterChangeHandler = null;
+const handlers = {};
 
-let rasterOpacityChangeHandler = null;
 
-let fieldLayerChangeHandler = null;
+// ============================================================
+// SMALL DOM HELPERS
+// ============================================================
 
-let fieldOpacityChangeHandler = null;
+const byId = (id) => document.getElementById(id);
 
-let clearFieldSelectionHandler = null;
+/** Replace the options of a <select>. Items are { value, label }. */
+function fillSelect(id, placeholder, items = []) {
 
-let stateChangeHandler = null;
+  const select = byId(id);
 
-let countyChangeHandler = null;
+  if (!select) {
+    return;
+  }
+
+  const options = [new Option(placeholder, "")];
+
+  for (const item of items) {
+    options.push(new Option(item.label, item.value));
+  }
+
+  select.replaceChildren(...options);
+}
+
+/** Opacity (0-1) <-> transparency percent (0-100). */
+const toTransparency = (opacity) => Math.round((1 - opacity) * 100);
+const toOpacity = (transparency) => 1 - Number(transparency) / 100;
 
 
 // ============================================================
 // INITIALIZE UI
 // ============================================================
 
-export function initializeUI({
-  onStateChange,
-  onCountyChange,
-  onRasterChange,
-  onRasterOpacityChange,
-  onFieldLayerChange,
-  onFieldOpacityChange,
-  onClearFieldSelection,
-} = {}) {
+export function initializeUI(callbacks = {}) {
 
-  stateChangeHandler =
-    onStateChange;
+  Object.assign(handlers, callbacks);
 
-  countyChangeHandler =
-    onCountyChange;
-
-  rasterChangeHandler =
-    onRasterChange;
-
-  rasterOpacityChangeHandler =
-    onRasterOpacityChange;
-
-  clearFieldSelectionHandler =
-    onClearFieldSelection;
-
-  fieldLayerChangeHandler =
-    onFieldLayerChange;
-
-  fieldOpacityChangeHandler =
-    onFieldOpacityChange;
-
-
-  // ----------------------------------------------------------
-  // APP TITLE
-  // ----------------------------------------------------------
-
-  const title =
-    document.getElementById(
-      "appTitle"
-    );
+  // Title / subtitle come from config.js
+  // (the logo is set in index.html).
+  const title = byId("appTitle");
+  const subtitle = byId("appSubtitle");
 
   if (title) {
-
-    title.textContent =
-      CONFIG.app.title;
+    title.textContent = CONFIG.app.title;
   }
-
-
-  const subtitle =
-    document.getElementById(
-      "appSubtitle"
-    );
 
   if (subtitle) {
-
-    subtitle.textContent =
-      CONFIG.app.subtitle;
+    subtitle.textContent = CONFIG.app.subtitle;
   }
 
+  // Dropdowns
+  byId("stateSelect")?.addEventListener("change", (event) =>
+    handlers.onStateChange?.(event.target.value)
+  );
 
-  const logo =
-    document.getElementById(
-      "logo"
-    );
+  byId("countySelect")?.addEventListener("change", (event) =>
+    handlers.onCountyChange?.(event.target.value)
+  );
 
-  if (logo) {
+  byId("fieldLayerSelect")?.addEventListener("change", (event) =>
+    handlers.onFieldLayerChange?.(event.target.value)
+  );
 
-    logo.src =
-      CONFIG.app.logo;
-  }
+  // Field transparency slider
+  const fieldSlider = byId("fieldOpacitySlider");
 
+  fieldSlider?.addEventListener("input", () => {
+    setFieldOpacityUI(toOpacity(fieldSlider.value));
+    handlers.onFieldOpacityChange?.(toOpacity(fieldSlider.value));
+  });
 
-  // ----------------------------------------------------------
-  // STATE DROPDOWN
-  // ----------------------------------------------------------
+  // Clear selected field
+  byId("clearFieldButton")?.addEventListener("click", () =>
+    handlers.onClearFieldSelection?.()
+  );
 
-  const stateSelect =
-    document.getElementById(
-      "stateSelect"
-    );
-
-  if (stateSelect) {
-
-    stateSelect.addEventListener(
-      "change",
-      async (event) => {
-
-        if (stateChangeHandler) {
-
-          await stateChangeHandler(
-            event.target.value
-          );
-        }
-      }
-    );
-  }
-
-
-  // ----------------------------------------------------------
-  // COUNTY DROPDOWN
-  // ----------------------------------------------------------
-
-  const countySelect =
-    document.getElementById(
-      "countySelect"
-    );
-
-  if (countySelect) {
-
-    countySelect.addEventListener(
-      "change",
-      async (event) => {
-
-        if (countyChangeHandler) {
-
-          await countyChangeHandler(
-            event.target.value
-          );
-        }
-      }
-    );
-  }
-
-
-  // ----------------------------------------------------------
-  // FIELD LAYER DROPDOWN
-  // ----------------------------------------------------------
-
-  const fieldSelect =
-    document.getElementById(
-      "fieldLayerSelect"
-    );
-
-  if (fieldSelect) {
-
-    fieldSelect.addEventListener(
-      "change",
-      (event) => {
-
-        if (fieldLayerChangeHandler) {
-
-          fieldLayerChangeHandler(
-            event.target.value
-          );
-        }
-      }
-    );
-  }
-
-
-  // ----------------------------------------------------------
-  // FIELD TRANSPARENCY SLIDER
-  // ----------------------------------------------------------
-
-  const fieldOpacitySlider =
-    document.getElementById(
-      "fieldOpacitySlider"
-    );
-
-  const fieldTransparencyValue =
-    document.getElementById(
-      "fieldTransparencyValue"
-    );
-
-
-  if (fieldOpacitySlider) {
-
-    fieldOpacitySlider.addEventListener(
-      "input",
-      () => {
-
-        const transparency =
-          Number(
-            fieldOpacitySlider.value
-          );
-
-
-        if (fieldTransparencyValue) {
-
-          fieldTransparencyValue.textContent =
-            `${transparency}%`;
-        }
-
-
-        // Convert transparency
-        // to ArcGIS opacity.
-
-        const opacity =
-          1 -
-          (
-            transparency / 100
-          );
-
-
-        if (
-          fieldOpacityChangeHandler
-        ) {
-
-          fieldOpacityChangeHandler(
-            opacity
-          );
-        }
-      }
-    );
-  }
-
-
-  // ----------------------------------------------------------
-  // CLEAR FIELD BUTTON
-  // ----------------------------------------------------------
-
-  const clearFieldButton =
-    document.getElementById(
-      "clearFieldButton"
-    );
-
-  if (clearFieldButton) {
-
-    clearFieldButton.addEventListener(
-      "click",
-      () => {
-
-        if (clearFieldSelectionHandler) {
-
-          clearFieldSelectionHandler();
-
-        } else {
-
-          renderFieldAttributes(
-            null
-          );
-        }
-      }
-    );
-  }
-
-
-  // ----------------------------------------------------------
-  // LEFT PANEL RESIZE
-  // ----------------------------------------------------------
-
-  initializeLeftPanelResize();
+  initializeRasterListEvents();
 }
 
 
 // ============================================================
-// STATE DROPDOWN
+// STATE + COUNTY DROPDOWNS
 // ============================================================
 
 export function populateStateDropdown(
-  states
+  states,
+  placeholder = "Select a state..."
 ) {
 
-  const select =
-    document.getElementById(
-      "stateSelect"
-    );
-
-  if (!select) {
-    return;
-  }
-
-
-  select.innerHTML = `
-    <option value="">
-      Select a state...
-    </option>
-  `;
-
-
-  for (
-    const state
-    of states
-  ) {
-
-    const option =
-      document.createElement(
-        "option"
-      );
-
-    option.value =
-      state.name;
-
-    option.textContent =
-      state.name;
-
-
-    if (
-      state.id !== undefined
-    ) {
-
-      option.dataset.stateId =
-        state.id;
-    }
-
-
-    select.appendChild(
-      option
-    );
-  }
+  fillSelect(
+    "stateSelect",
+    placeholder,
+    states.map((state) => ({ value: state.name, label: state.name }))
+  );
 }
 
+export function populateCountyDropdown(counties) {
 
-// ============================================================
-// COUNTY DROPDOWN
-// ============================================================
-
-export function populateCountyDropdown(
-  counties
-) {
-
-  const select =
-    document.getElementById(
-      "countySelect"
-    );
-
-  if (!select) {
-    return;
-  }
-
-
-  select.innerHTML = `
-    <option value="">
-      Select a county...
-    </option>
-  `;
-
-
-  for (
-    const county
-    of counties
-  ) {
-
-    const option =
-      document.createElement(
-        "option"
-      );
-
-    option.value =
-      county.id;
-
-    option.textContent =
-      county.name;
-
-
-    select.appendChild(
-      option
-    );
-  }
+  fillSelect(
+    "countySelect",
+    "Select a county...",
+    counties.map((county) => ({ value: county.id, label: county.name }))
+  );
 }
 
+export function setCountyEnabled(enabled) {
 
-// ============================================================
-// COUNTY DROPDOWN ENABLE / DISABLE
-// ============================================================
+  const select = byId("countySelect");
 
-export function setCountyEnabled(
-  enabled
-) {
-
-  const select =
-    document.getElementById(
-      "countySelect"
-    );
-
-  if (!select) {
-    return;
+  if (select) {
+    select.disabled = !enabled;
   }
-
-
-  select.disabled =
-    !enabled;
 }
 
 
@@ -403,39 +133,65 @@ export function setCountyEnabled(
 // RASTER LIST
 // ============================================================
 //
-// Each raster is independently controlled.
-//
-// Checkbox:
-//   Turns that raster on/off.
-//
-// Transparency slider:
-//   Controls only that raster.
-//
+// Each raster has its own checkbox and transparency slider.
 // Multiple rasters can be visible at once.
-// ============================================================
+//
+// Events are handled once on the list container (event
+// delegation), so re-rendering the list never leaks listeners.
+//
 
-export function renderRasterList(
-  rasters
-) {
+function initializeRasterListEvents() {
 
-  const container =
-    document.getElementById(
-      "rasterList"
-    );
+  const container = byId("rasterList");
 
   if (!container) {
     return;
   }
 
+  container.addEventListener("change", (event) => {
 
-  container.innerHTML =
-    "";
+    const checkbox = event.target.closest(".raster-visibility");
 
+    if (!checkbox) {
+      return;
+    }
 
-  if (
-    !rasters ||
-    rasters.length === 0
-  ) {
+    const rasterId = checkbox.closest(".raster-option")?.dataset.rasterId;
+
+    handlers.onRasterChange?.(rasterId, checkbox.checked);
+  });
+
+  container.addEventListener("input", (event) => {
+
+    const slider = event.target.closest(".raster-opacity-slider");
+
+    if (!slider) {
+      return;
+    }
+
+    const wrapper = slider.closest(".raster-option");
+    const label = wrapper.querySelector(".raster-transparency-value");
+
+    if (label) {
+      label.textContent = `${slider.value}%`;
+    }
+
+    handlers.onRasterOpacityChange?.(
+      wrapper.dataset.rasterId,
+      toOpacity(slider.value)
+    );
+  });
+}
+
+export function renderRasterList(rasters) {
+
+  const container = byId("rasterList");
+
+  if (!container) {
+    return;
+  }
+
+  if (!rasters || rasters.length === 0) {
 
     container.innerHTML = `
       <div class="empty-state">
@@ -446,511 +202,165 @@ export function renderRasterList(
     return;
   }
 
+  container.innerHTML = rasters.map((raster) => {
 
-  // ----------------------------------------------------------
-  // CREATE EACH RASTER
-  // ----------------------------------------------------------
+    const transparency = toTransparency(
+      raster.opacity ?? CONFIG.defaults.rasterOpacity
+    );
 
-  for (
-    const raster
-    of rasters
-  ) {
+    const id = escapeHtml(raster.id);
 
-    const wrapper =
-      document.createElement(
-        "div"
-      );
-
-
-    wrapper.className =
-      "raster-option";
-
-
-    // --------------------------------------------------------
-    // STARTING OPACITY
-    // --------------------------------------------------------
-
-    const startingOpacity =
-      raster.opacity !== undefined
-        ? raster.opacity
-        : 0.85;
-
-
-    const startingTransparency =
-      Math.round(
-        (1 - startingOpacity) * 100
-      );
-
-
-    // --------------------------------------------------------
-    // RASTER HTML
-    // --------------------------------------------------------
-
-    wrapper.innerHTML = `
-
-      <div class="raster-header">
+    return `
+      <div class="raster-option" data-raster-id="${id}">
 
         <label class="layer-option">
 
-          <input
-            type="checkbox"
-            class="raster-visibility"
-            value="${escapeHtml(
-              raster.id
-            )}"
-          />
+          <input type="checkbox" class="raster-visibility" />
 
           <span class="layer-option-text">
-
-            <strong>
-              ${escapeHtml(
-                raster.title
-              )}
-            </strong>
-
-            ${
-              raster.description
-                ? `
-                  <small>
-                    ${escapeHtml(
-                      raster.description
-                    )}
-                  </small>
-                `
-                : ""
-            }
-
+            <strong>${escapeHtml(raster.title)}</strong>
+            ${raster.description
+              ? `<small>${escapeHtml(raster.description)}</small>`
+              : ""}
           </span>
 
         </label>
 
-      </div>
+        <div class="raster-opacity">
 
+          <div class="opacity-header">
+            <span>Transparency</span>
+            <span class="raster-transparency-value">${transparency}%</span>
+          </div>
 
-      <div class="raster-opacity">
+          <input
+            type="range"
+            class="opacity-slider raster-opacity-slider"
+            aria-label="${escapeHtml(raster.title)} transparency"
+            min="0"
+            max="100"
+            step="1"
+            value="${transparency}"
+          />
 
-        <div class="opacity-header">
-
-          <span>
-            Transparency
-          </span>
-
-          <span
-            class="raster-transparency-value"
-          >
-            ${startingTransparency}%
-          </span>
-
-        </div>
-
-
-        <input
-          type="range"
-          class="opacity-slider raster-opacity-slider"
-          min="0"
-          max="100"
-          step="1"
-          value="${startingTransparency}"
-        />
-
-
-        <div class="opacity-labels">
-
-          <span>
-            Opaque
-          </span>
-
-          <span>
-            Transparent
-          </span>
+          <div class="opacity-labels">
+            <span>Opaque</span>
+            <span>Transparent</span>
+          </div>
 
         </div>
 
       </div>
-
     `;
 
-
-    // --------------------------------------------------------
-    // VISIBILITY CHECKBOX
-    // --------------------------------------------------------
-
-    const checkbox =
-      wrapper.querySelector(
-        ".raster-visibility"
-      );
-
-
-    if (checkbox) {
-
-      checkbox.addEventListener(
-        "change",
-        () => {
-
-          if (
-            rasterChangeHandler
-          ) {
-
-            rasterChangeHandler(
-              raster.id,
-              checkbox.checked
-            );
-          }
-        }
-      );
-    }
-
-
-    // --------------------------------------------------------
-    // TRANSPARENCY SLIDER
-    // --------------------------------------------------------
-
-    const slider =
-      wrapper.querySelector(
-        ".raster-opacity-slider"
-      );
-
-
-    const valueLabel =
-      wrapper.querySelector(
-        ".raster-transparency-value"
-      );
-
-
-    if (slider) {
-
-      slider.addEventListener(
-        "input",
-        () => {
-
-          const transparency =
-            Number(
-              slider.value
-            );
-
-
-          if (valueLabel) {
-
-            valueLabel.textContent =
-              `${transparency}%`;
-          }
-
-
-          const opacity =
-            1 -
-            (
-              transparency / 100
-            );
-
-
-          if (
-            rasterOpacityChangeHandler
-          ) {
-
-            rasterOpacityChangeHandler(
-              raster.id,
-              opacity
-            );
-          }
-        }
-      );
-    }
-
-
-    container.appendChild(
-      wrapper
-    );
-  }
+  }).join("");
 }
-
-
-// ============================================================
-// CLEAR RASTER LIST
-// ============================================================
 
 export function clearRasterList() {
 
-  const container =
-    document.getElementById(
-      "rasterList"
-    );
+  const container = byId("rasterList");
 
-  if (!container) {
-    return;
-  }
-
-
-  container.innerHTML = `
-    <div class="empty-state">
-      Select a state to view available datasets.
-    </div>
-  `;
-}
-
-
-// ============================================================
-// RASTER LOADING
-// ============================================================
-
-export function setRasterLoading(
-  isLoading
-) {
-
-  const container =
-    document.getElementById(
-      "rasterList"
-    );
-
-  if (!container) {
-    return;
-  }
-
-
-  if (isLoading) {
-
-    container.classList.add(
-      "loading"
-    );
-
-
-    let loading =
-      container.querySelector(
-        ".raster-loading"
-      );
-
-
-    if (!loading) {
-
-      loading =
-        document.createElement(
-          "div"
-        );
-
-
-      loading.className =
-        "raster-loading";
-
-
-      loading.textContent =
-        "Loading raster...";
-
-
-      container.appendChild(
-        loading
-      );
-    }
-
-  } else {
-
-    container.classList.remove(
-      "loading"
-    );
-
-
-    const loading =
-      container.querySelector(
-        ".raster-loading"
-      );
-
-
-    if (loading) {
-
-      loading.remove();
-    }
-  }
-}
-
-
-// ============================================================
-// FIELD LAYER LIST
-// ============================================================
-//
-// Selecting a state does NOT automatically select
-// a field layer.
-// ============================================================
-
-export function renderFieldLayerList(
-  fields
-) {
-
-  const select =
-    document.getElementById(
-      "fieldLayerSelect"
-    );
-
-  if (!select) {
-    return;
-  }
-
-
-  select.innerHTML = `
-    <option value="">
-      Select a field layer...
-    </option>
-  `;
-
-
-  if (
-    !fields ||
-    fields.length === 0
-  ) {
-
-    return;
-  }
-
-
-  for (
-    const field
-    of fields
-  ) {
-
-    const option =
-      document.createElement(
-        "option"
-      );
-
-
-    option.value =
-      field.id;
-
-
-    option.textContent =
-      field.title;
-
-
-    select.appendChild(
-      option
-    );
-  }
-
-
-  // No field layer is selected automatically.
-}
-
-
-// ============================================================
-// CLEAR FIELD LAYERS
-// ============================================================
-
-export function clearFieldLayerList() {
-
-  const select =
-    document.getElementById(
-      "fieldLayerSelect"
-    );
-
-  if (!select) {
-    return;
-  }
-
-
-  select.innerHTML = `
-    <option value="">
-      Select a field layer...
-    </option>
-  `;
-}
-
-
-// ============================================================
-// FIELD OPACITY UI
-// ============================================================
-
-export function setFieldOpacityUI(
-  opacity
-) {
-
-  const slider =
-    document.getElementById(
-      "fieldOpacitySlider"
-    );
-
-
-  const valueLabel =
-    document.getElementById(
-      "fieldTransparencyValue"
-    );
-
-
-  if (!slider) {
-    return;
-  }
-
-
-  const transparency =
-    Math.round(
-      (1 - opacity) * 100
-    );
-
-
-  slider.value =
-    transparency;
-
-
-  if (valueLabel) {
-
-    valueLabel.textContent =
-      `${transparency}%`;
-  }
-}
-
-
-// ============================================================
-// COUNTY REPORT
-// ============================================================
-
-export async function renderCountyReport(
-  selection
-) {
-
-  const container =
-    document.getElementById(
-      "countyReport"
-    );
-
-  if (!container) {
-    return;
-  }
-
-
-  if (!selection) {
-
+  if (container) {
     container.innerHTML = `
       <div class="empty-state">
-        Select a county to view its weekly report.
+        Select a state to view available datasets.
       </div>
     `;
+  }
+}
 
+/**
+ * A raster service failed to load: switch its checkbox off, disable it
+ * and say so, instead of leaving a control that silently does nothing.
+ */
+export function markRasterUnavailable(rasterId) {
+
+  const wrapper = byId("rasterList")?.querySelector(
+    `.raster-option[data-raster-id="${CSS.escape(rasterId)}"]`
+  );
+
+  if (!wrapper) {
     return;
   }
 
+  wrapper.classList.add("unavailable");
 
-  container.innerHTML = `
-    <div class="loading-state">
-      Loading county report...
-    </div>
-  `;
+  const checkbox = wrapper.querySelector(".raster-visibility");
+
+  if (checkbox) {
+    checkbox.checked = false;
+    checkbox.disabled = true;
+  }
+
+  const text = wrapper.querySelector(".layer-option-text");
+
+  if (text && !text.querySelector(".unavailable-note")) {
+    text.insertAdjacentHTML(
+      "beforeend",
+      `<small class="unavailable-note">Could not load this dataset.</small>`
+    );
+  }
+
+  wrapper.querySelector(".raster-opacity-slider")?.setAttribute("disabled", "");
+}
 
 
-  container.innerHTML = `
+// ============================================================
+// LEGEND
+// ============================================================
+//
+// `layerInfos` is an array of { layer, title } for the visible
+// rasters. An empty array shows the placeholder message.
+//
 
-    <div class="report-title">
-      ${escapeHtml(
-        selection.countyName
-      )} County
-    </div>
+export function setLegend(layerInfos) {
 
-    <div class="report-meta">
-      ${escapeHtml(
-        selection.stateName || ""
-      )}
-    </div>
+  const legend = byId("legend");
+  const empty = byId("legendEmpty");
 
-    <div class="report-summary">
-      Weekly county report will appear here.
-    </div>
+  if (!legend || !empty) {
+    return;
+  }
 
-  `;
+  const hasLayers = layerInfos.length > 0;
+
+  if (hasLayers) {
+    legend.layerInfos = layerInfos;
+  }
+
+  legend.hidden = !hasLayers;
+  empty.hidden = hasLayers;
+}
+
+
+// ============================================================
+// FIELD LAYER DROPDOWN + OPACITY
+// ============================================================
+
+/** Pass an empty array to reset the dropdown. */
+export function renderFieldLayerList(fields) {
+
+  fillSelect(
+    "fieldLayerSelect",
+    "Select a field layer...",
+    (fields ?? []).map((field) => ({ value: field.id, label: field.title }))
+  );
+}
+
+export function setFieldOpacityUI(opacity) {
+
+  const slider = byId("fieldOpacitySlider");
+  const label = byId("fieldTransparencyValue");
+
+  const transparency = toTransparency(opacity);
+
+  if (slider) {
+    slider.value = transparency;
+  }
+
+  if (label) {
+    label.textContent = `${transparency}%`;
+  }
 }
 
 
@@ -958,20 +368,13 @@ export async function renderCountyReport(
 // FIELD ATTRIBUTES
 // ============================================================
 
-export function renderFieldAttributes(
-  attributes
-) {
+export function renderFieldAttributes(attributes) {
 
-  const container =
-    document.getElementById(
-      "fieldAttributes"
-    );
-
+  const container = byId("fieldAttributes");
 
   if (!container) {
     return;
   }
-
 
   if (!attributes) {
 
@@ -984,244 +387,23 @@ export function renderFieldAttributes(
     return;
   }
 
-
-  const entries =
-    Object.entries(
-      attributes
-    );
-
-
-  container.innerHTML =
-    "";
-
-
-  for (
-    const [
-      field,
-      value,
-    ]
-    of entries
-  ) {
-
-    const row =
-      document.createElement(
-        "div"
-      );
-
-
-    row.className =
-      "attribute-row";
-
-
-    row.innerHTML = `
-
-      <div class="attribute-name">
-        ${escapeHtml(
-          field
-        )}
+  container.innerHTML = Object.entries(attributes).map(
+    ([name, value]) => `
+      <div class="attribute-row">
+        <div class="attribute-name">${escapeHtml(name)}</div>
+        <div class="attribute-value">${escapeHtml(formatValue(value))}</div>
       </div>
-
-      <div class="attribute-value">
-        ${escapeHtml(
-          formatValue(value)
-        )}
-      </div>
-
-    `;
-
-
-    container.appendChild(
-      row
-    );
-  }
+    `
+  ).join("");
 }
 
+function formatValue(value) {
 
-// ============================================================
-// FORMAT VALUE
-// ============================================================
-
-function formatValue(
-  value
-) {
-
-  if (
-    value === null ||
-    value === undefined
-  ) {
-
+  if (value === null || value === undefined || value === "") {
     return "—";
   }
 
-
-  if (
-    typeof value === "object"
-  ) {
-
-    return JSON.stringify(
-      value
-    );
-  }
-
-
-  return String(
-    value
-  );
-}
-
-
-// ============================================================
-// HTML ESCAPING
-// ============================================================
-
-function escapeHtml(
-  value
-) {
-
-  return String(
-    value
-  )
-
-    .replaceAll(
-      "&",
-      "&amp;"
-    )
-
-    .replaceAll(
-      "<",
-      "&lt;"
-    )
-
-    .replaceAll(
-      ">",
-      "&gt;"
-    )
-
-    .replaceAll(
-      '"',
-      "&quot;"
-    )
-
-    .replaceAll(
-      "'",
-      "&#039;"
-    );
-}
-
-
-// ============================================================
-// LEFT PANEL RESIZING
-// ============================================================
-
-function initializeLeftPanelResize() {
-
-  const panel =
-    document.getElementById(
-      "leftPanel"
-    );
-
-
-  const handle =
-    document.getElementById(
-      "leftResizeHandle"
-    );
-
-
-  if (
-    !panel ||
-    !handle
-  ) {
-
-    return;
-  }
-
-
-  let dragging =
-    false;
-
-
-  handle.addEventListener(
-    "pointerdown",
-    (event) => {
-
-      dragging =
-        true;
-
-
-      handle.setPointerCapture(
-        event.pointerId
-      );
-
-
-      document.body.classList.add(
-        "resizing"
-      );
-    }
-  );
-
-
-  handle.addEventListener(
-    "pointermove",
-    (event) => {
-
-      if (!dragging) {
-        return;
-      }
-
-
-      const minimumWidth =
-        240;
-
-
-      const maximumWidth =
-        Math.min(
-          600,
-          window.innerWidth * 0.45
-        );
-
-
-      const width =
-        Math.max(
-          minimumWidth,
-          Math.min(
-            maximumWidth,
-            event.clientX
-          )
-        );
-
-
-      panel.style.width =
-        `${width}px`;
-    }
-  );
-
-
-  handle.addEventListener(
-    "pointerup",
-    () => {
-
-      dragging =
-        false;
-
-
-      document.body.classList.remove(
-        "resizing"
-      );
-    }
-  );
-
-
-  handle.addEventListener(
-    "pointercancel",
-    () => {
-
-      dragging =
-        false;
-
-
-      document.body.classList.remove(
-        "resizing"
-      );
-    }
-  );
+  return typeof value === "object"
+    ? JSON.stringify(value)
+    : String(value);
 }

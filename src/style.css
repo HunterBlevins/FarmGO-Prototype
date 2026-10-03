@@ -6,6 +6,10 @@
   box-sizing: border-box;
 }
 
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   margin: 0;
@@ -25,28 +29,30 @@ body {
   background: #f4f5f6;
 }
 
+body {
+  display: flex;
+  flex-direction: column;
+}
+
 body.resizing {
   cursor: col-resize;
   user-select: none;
 }
-
 
 /* ============================================================
    TOP BAR
    ============================================================ */
 
 #topbar {
-  height: 64px;
-
-  background: #fff;
-
-  border-bottom:
-    1px solid #d8dadd;
+  flex: 0 0 64px;
 
   display: flex;
   align-items: center;
 
   padding: 0 18px;
+
+  background: #fff;
+  border-bottom: 1px solid #d8dadd;
 
   position: relative;
   z-index: 10;
@@ -70,7 +76,6 @@ body.resizing {
 
   font-size: 20px;
   line-height: 1.1;
-
   font-weight: 650;
 }
 
@@ -78,24 +83,20 @@ body.resizing {
   margin-top: 3px;
 
   color: #667;
-
   font-size: 12px;
 }
-
 
 /* ============================================================
    MAIN APPLICATION
    ============================================================ */
 
 #app {
-  width: 100%;
-  height: calc(100vh - 64px);
+  flex: 1;
+  min-height: 0;
 
   display: flex;
-
   overflow: hidden;
 }
-
 
 /* ============================================================
    SIDE PANELS
@@ -103,6 +104,7 @@ body.resizing {
 
 .side-panel {
   position: relative;
+  flex-shrink: 0;
 
   background: #fff;
 
@@ -112,23 +114,21 @@ body.resizing {
   z-index: 5;
 }
 
-
-/* ============================================================
-   LEFT PANEL
-   ============================================================ */
-
 #leftPanel {
   width: 320px;
-
   min-width: 240px;
   max-width: 45vw;
 
-  flex-shrink: 0;
-
-  border-right:
-    1px solid #d8dadd;
+  border-right: 1px solid #d8dadd;
 }
 
+.right-panel {
+  width: 420px;
+  min-width: 280px;
+  max-width: 55vw;
+
+  border-left: 1px solid #d8dadd;
+}
 
 /* ============================================================
    MAP
@@ -136,11 +136,9 @@ body.resizing {
 
 #mapContainer {
   flex: 1;
-
-  min-width: 300px;
+  min-width: 0;
 
   position: relative;
-
   overflow: hidden;
 }
 
@@ -152,70 +150,36 @@ body.resizing {
   outline: none;
 }
 
-
-/* ============================================================
-   RIGHT PANEL
-   ============================================================ */
-
-.right-panel {
-  position: relative;
-
-  width: 420px;
-
-  min-width: 320px;
-
-  max-width: 65vw;
-
-  flex-shrink: 0;
-
-  border-left:
-    1px solid #d8dadd;
-
-  background: #fff;
-
-  overflow-y: auto;
-}
-
-
 /* ============================================================
    RESIZE HANDLES
    ============================================================ */
 
 .resize-handle {
   position: absolute;
-
   top: 0;
   bottom: 0;
 
   width: 7px;
 
   cursor: col-resize;
+  touch-action: none;
 
   z-index: 50;
 }
-
-
-/* Left panel handle */
 
 #leftResizeHandle {
   right: 0;
 }
 
-
-/* Right panel handle */
-
 #rightResizeHandle {
   left: 0;
 }
 
-
-/* Hover */
-
-.resize-handle:hover {
-  background:
-    rgba(0, 0, 0, 0.12);
+.resize-handle:hover,
+.resize-handle:focus-visible {
+  background: rgba(0, 0, 0, 0.12);
+  outline: none;
 }
-
 
 /* ============================================================
    PANELS
@@ -224,15 +188,13 @@ body.resizing {
 .panel-section {
   padding: 18px;
 
-  border-bottom:
-    1px solid #e2e3e5;
+  border-bottom: 1px solid #e2e3e5;
 }
 
 .panel-section h2 {
   margin: 0 0 14px;
 
   font-size: 15px;
-
   font-weight: 650;
 }
 
@@ -242,12 +204,9 @@ body.resizing {
   margin: 0 0 6px;
 
   color: #555;
-
   font-size: 12px;
-
   font-weight: 600;
 }
-
 
 /* ============================================================
    DROPDOWNS
@@ -258,57 +217,46 @@ select {
   height: 36px;
 
   margin-bottom: 14px;
-
   padding: 0 10px;
 
-  border:
-    1px solid #c9ccd0;
-
+  border: 1px solid #c9ccd0;
   border-radius: 5px;
 
   background: #fff;
-
   color: #222;
 
   font: inherit;
-
   font-size: 13px;
 }
 
 select:disabled {
   color: #999;
-
   background: #f4f4f4;
 }
 
-
 /* ============================================================
-   FIELD TRANSPARENCY
+   TRANSPARENCY SLIDERS
    ============================================================ */
 
 .field-opacity-control {
-  margin-top: 0;
   margin-bottom: 2px;
 }
 
 .opacity-header {
   display: flex;
-
   justify-content: space-between;
   align-items: center;
 
   margin-bottom: 6px;
 
   color: #555;
-
   font-size: 12px;
-
   font-weight: 600;
 }
 
-#fieldTransparencyValue {
+#fieldTransparencyValue,
+.raster-transparency-value {
   color: #777;
-
   font-weight: 500;
 }
 
@@ -323,16 +271,13 @@ select:disabled {
 
 .opacity-labels {
   display: flex;
-
   justify-content: space-between;
 
   margin-top: 3px;
 
   color: #888;
-
   font-size: 10px;
 }
-
 
 /* ============================================================
    RASTER LIST
@@ -340,33 +285,39 @@ select:disabled {
 
 .layer-list {
   display: flex;
-
   flex-direction: column;
-
   gap: 8px;
 }
 
-.layer-option {
-  display: flex !important;
-
-  align-items: flex-start;
-
-  gap: 9px;
-
+.raster-option {
   padding: 9px;
 
-  border:
-    1px solid #dedfe1;
-
+  border: 1px solid #dedfe1;
   border-radius: 6px;
-
-  cursor: pointer;
-
-  background: #fff;
 }
 
-.layer-option:hover {
-  background: #f7f8f8;
+.raster-option .layer-option {
+  margin: 0;
+}
+
+.raster-opacity {
+  margin-top: 10px;
+}
+
+.raster-option.unavailable {
+  opacity: 0.6;
+}
+
+.unavailable-note {
+  color: #b42318 !important;
+}
+
+.layer-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+
+  cursor: pointer;
 }
 
 .layer-option input {
@@ -377,7 +328,6 @@ select:disabled {
   display: block;
 
   font-size: 13px;
-
   font-weight: 600;
 }
 
@@ -387,29 +337,17 @@ select:disabled {
   margin-top: 3px;
 
   color: #777;
-
   font-size: 11px;
-
   line-height: 1.35;
 }
-
 
 /* ============================================================
    LEGEND
    ============================================================ */
 
-.legend-container {
-  min-height: 50px;
+arcgis-legend {
+  display: block;
 }
-
-.esri-legend {
-  background: transparent !important;
-
-  box-shadow: none !important;
-
-  padding: 0 !important;
-}
-
 
 /* ============================================================
    COUNTY REPORT
@@ -419,37 +357,25 @@ select:disabled {
   width: 100%;
 
   font-size: 13px;
-
   line-height: 1.5;
 }
 
 .county-report {
   width: 100%;
-
-  box-sizing: border-box;
 }
-
-
-/* ============================================================
-   REPORT HEADER
-   ============================================================ */
 
 .report-header {
   margin-bottom: 20px;
-
   padding-bottom: 15px;
 
-  border-bottom:
-    1px solid rgba(0, 0, 0, 0.12);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.12);
 }
 
 .report-county {
   margin: 0;
 
   font-size: 26px;
-
   font-weight: 700;
-
   line-height: 1.2;
 }
 
@@ -457,14 +383,8 @@ select:disabled {
   margin-top: 6px;
 
   font-size: 14px;
-
   color: #666;
 }
-
-
-/* ============================================================
-   REPORT SECTIONS
-   ============================================================ */
 
 .report-section {
   width: 100%;
@@ -472,65 +392,69 @@ select:disabled {
   margin-bottom: 24px;
 }
 
-.report-section h4 {
-  margin: 0 0 10px;
-
-  font-size: 17px;
-
-  font-weight: 700;
-}
-
-
-/* ============================================================
-   REPORT CHART
-   ============================================================ */
-
 .report-chart {
   width: 100%;
-
   min-width: 0;
-
-  margin-top: 12px;
 }
 
+.report-loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  color: #666;
+  font-size: 13px;
+}
+
+.report-loading-spinner {
+  width: 18px;
+  height: 18px;
+
+  border: 3px solid #d8dadd;
+  border-top-color: #2563eb;
+  border-radius: 50%;
+
+  animation: report-spin 0.8s linear infinite;
+}
+
+@keyframes report-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.report-error {
+  padding: 12px;
+
+  border: 1px solid #f3c1bc;
+  border-radius: 6px;
+
+  background: #fef3f2;
+  color: #b42318;
+  font-size: 13px;
+}
 
 /* ============================================================
-   CHART CARD
+   CHARTS
    ============================================================ */
 
 .report-chart-card {
   width: 100%;
-
   min-width: 0;
-
-  box-sizing: border-box;
 
   padding: 18px;
 
+  border: 1px solid rgba(0, 0, 0, 0.1);
   border-radius: 12px;
 
-  background:
-    rgba(255, 255, 255, 0.97);
-
-  border:
-    1px solid rgba(0, 0, 0, 0.10);
-
-  box-shadow:
-    0 3px 12px rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08);
 }
-
-
-/* ============================================================
-   CHART HEADER
-   ============================================================ */
 
 .report-chart-header {
   display: flex;
-
   align-items: flex-start;
-
   justify-content: space-between;
-
   gap: 12px;
 
   margin-bottom: 12px;
@@ -538,9 +462,7 @@ select:disabled {
 
 .report-chart-title {
   font-size: 20px;
-
   font-weight: 700;
-
   line-height: 1.25;
 }
 
@@ -548,256 +470,97 @@ select:disabled {
   margin-top: 5px;
 
   font-size: 14px;
-
   color: #666;
-
   line-height: 1.4;
 }
 
-
-/* ============================================================
-   CHART SVG
-   ============================================================ */
-
 .report-chart-svg-wrapper {
   width: 100%;
-
-  height: 320px;
-
-  overflow: hidden;
 }
 
+/* The SVG is drawn at the container's width, so it keeps its
+   natural proportions and its text is never stretched. */
 .report-chart-svg {
   display: block;
 
   width: 100%;
-
-  height: 100%;
+  height: auto;
 }
 
-
-/* ============================================================
-   CHART GRID
-   ============================================================ */
-
 .chart-grid-line {
-  stroke:
-    rgba(0, 0, 0, 0.10);
-
+  stroke: rgba(0, 0, 0, 0.1);
   stroke-width: 1;
 }
 
 .chart-axis {
-  stroke:
-    rgba(0, 0, 0, 0.45);
-
-  stroke-width: 2;
+  stroke: rgba(0, 0, 0, 0.45);
+  stroke-width: 1.5;
 }
-
-
-/* ============================================================
-   CHART LABELS
-   ============================================================ */
 
 .chart-axis-label {
-  font-size: 17px;
-
+  font-size: 12px;
   fill: #444;
-
-  font-family:
-    Arial,
-    Helvetica,
-    sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
-
-/* ============================================================
-   GENERIC CHART LINE
-   ============================================================ */
+/* Series colour comes from the inline `color` style. */
 
 .chart-line {
-  stroke: #2563eb;
-
-  stroke-width: 4;
-
+  stroke: currentColor;
+  stroke-width: 2.5;
   stroke-linejoin: round;
-
   stroke-linecap: round;
-
   fill: none;
 }
-
-
-/* ============================================================
-   GENERIC CHART POINTS
-   ============================================================ */
 
 .chart-point {
-  fill: #2563eb;
-
-  stroke: white;
-
-  stroke-width: 2;
+  fill: currentColor;
+  stroke: #fff;
+  stroke-width: 1.5;
 }
 
-
-/* ============================================================
-   TEMPERATURE CHART LINES
-   ============================================================ */
-
-/* Minimum — blue */
-
-.chart-line-temperature-min {
-  stroke: #2563eb;
-
-  stroke-width: 4;
-
-  stroke-linejoin: round;
-
-  stroke-linecap: round;
-
-  fill: none;
+/* Invisible hover target used when a series has many points. */
+.chart-point-hover {
+  fill: transparent;
+  pointer-events: all;
 }
 
-
-/* Mean — orange */
-
-.chart-line-temperature-mean {
-  stroke: #f59e0b;
-
-  stroke-width: 4;
-
-  stroke-linejoin: round;
-
-  stroke-linecap: round;
-
-  fill: none;
+.chart-point-hover:hover {
+  fill: currentColor;
 }
 
-
-/* Maximum — red */
-
-.chart-line-temperature-max {
-  stroke: #dc2626;
-
-  stroke-width: 4;
-
-  stroke-linejoin: round;
-
-  stroke-linecap: round;
-
-  fill: none;
-}
-
-
-/* ============================================================
-   TEMPERATURE CHART POINTS
-   ============================================================ */
-
-/* Minimum — blue */
-
-.chart-point-temperature-min {
-  fill: #2563eb;
-
-  stroke: white;
-
-  stroke-width: 2;
-}
-
-
-/* Mean — orange */
-
-.chart-point-temperature-mean {
-  fill: #f59e0b;
-
-  stroke: white;
-
-  stroke-width: 2;
-}
-
-
-/* Maximum — red */
-
-.chart-point-temperature-max {
-  fill: #dc2626;
-
-  stroke: white;
-
-  stroke-width: 2;
-}
-
-
-/* ============================================================
-   TEMPERATURE LEGEND
-   ============================================================ */
-
-.temperature-legend {
+.chart-legend {
   display: flex;
-
   flex-direction: column;
-
   gap: 5px;
 
   font-size: 13px;
-
   white-space: nowrap;
 }
 
-.temperature-legend-item {
+.chart-legend-item {
   display: flex;
-
   align-items: center;
-
   gap: 6px;
 }
 
-.temperature-legend-marker {
+.chart-legend-marker {
   display: inline-block;
 
   width: 12px;
   height: 12px;
 
   border-radius: 50%;
-
   flex-shrink: 0;
 }
-
-
-/* Minimum */
-
-.temperature-legend-min {
-  background: #2563eb;
-}
-
-
-/* Mean */
-
-.temperature-legend-mean {
-  background: #f59e0b;
-}
-
-
-/* Maximum */
-
-.temperature-legend-max {
-  background: #dc2626;
-}
-
-
-/* ============================================================
-   NO DATA
-   ============================================================ */
 
 .report-no-data {
   padding: 25px;
 
   text-align: center;
-
   font-size: 15px;
-
   color: #666;
 }
-
 
 /* ============================================================
    FIELD ATTRIBUTES
@@ -805,11 +568,8 @@ select:disabled {
 
 .section-heading-row {
   display: flex;
-
   align-items: center;
-
   justify-content: space-between;
-
   gap: 10px;
 }
 
@@ -818,17 +578,13 @@ select:disabled {
 }
 
 #clearFieldButton {
-  border:
-    1px solid #c9ccd0;
+  padding: 5px 9px;
 
+  border: 1px solid #c9ccd0;
   border-radius: 5px;
 
   background: #fff;
-
-  padding: 5px 9px;
-
   cursor: pointer;
-
   font-size: 11px;
 }
 
@@ -837,19 +593,21 @@ select:disabled {
 }
 
 .attribute-container {
-  border:
-    1px solid #e0e1e3;
-
+  border: 1px solid #e0e1e3;
   border-radius: 6px;
 
   overflow: hidden;
 }
 
+.attribute-container:has(.empty-state) {
+  padding: 10px;
+  border-style: dashed;
+}
+
 .attribute-row {
   padding: 9px 10px;
 
-  border-bottom:
-    1px solid #e7e8ea;
+  border-bottom: 1px solid #e7e8ea;
 }
 
 .attribute-row:last-child {
@@ -860,11 +618,8 @@ select:disabled {
   color: #666;
 
   font-size: 10px;
-
   font-weight: 700;
-
   text-transform: uppercase;
-
   letter-spacing: 0.03em;
 }
 
@@ -872,24 +627,19 @@ select:disabled {
   margin-top: 2px;
 
   font-size: 12px;
-
   overflow-wrap: anywhere;
 }
 
-
 /* ============================================================
-   EMPTY / LOADING
+   EMPTY STATES
    ============================================================ */
 
-.empty-state,
-.loading-state {
+.empty-state {
   color: #777;
 
   font-size: 12px;
-
   line-height: 1.5;
 }
-
 
 /* ============================================================
    MAP CONTROLS
@@ -897,18 +647,14 @@ select:disabled {
 
 #mapControls {
   position: absolute;
-
   top: 16px;
   right: 16px;
 
   z-index: 1000;
 
   display: flex;
-
   flex-direction: column;
-
   align-items: flex-end;
-
   gap: 8px;
 
   pointer-events: none;
@@ -923,43 +669,54 @@ select:disabled {
 
 #mapSearch {
   width: 320px;
+  max-width: calc(100vw - 32px);
 }
-
-#mapCompass {
-  width: auto;
-  height: auto;
-}
-
 
 /* ============================================================
-   RESPONSIVE
+   SMALL SCREENS
+   ============================================================
+   Panels stack above and below the map instead of being
+   hidden, so the county report and field attributes are still
+   reachable on tablets and phones.
    ============================================================ */
 
 @media (max-width: 900px) {
 
   #app {
-    position: relative;
+    flex-direction: column;
   }
 
+  #leftPanel,
   .right-panel {
-    display: none;
+    width: 100% !important; /* beats the width set by dragging */
+    min-width: 0;
+    max-width: none;
+
+    flex: 0 0 auto;
+    max-height: 32%;
+
+    border: 0;
   }
 
   #leftPanel {
-    width: 280px;
+    border-bottom: 1px solid #d8dadd;
   }
-
-}
-
-
-/* ============================================================
-   VERY NARROW RIGHT PANEL
-   ============================================================ */
-
-@media (max-width: 1200px) {
 
   .right-panel {
-    min-width: 300px;
+    border-top: 1px solid #d8dadd;
   }
 
+  #mapContainer {
+    flex: 1;
+    min-height: 220px;
+  }
+
+  .resize-handle {
+    display: none;
+  }
+
+  #mapControls {
+    top: 8px;
+    right: 8px;
+  }
 }

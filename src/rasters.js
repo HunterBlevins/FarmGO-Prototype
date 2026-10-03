@@ -1,5 +1,4 @@
 import ImageryTileLayer from "@arcgis/core/layers/ImageryTileLayer.js";
-import Legend from "@arcgis/core/widgets/Legend.js";
 
 import {
   createColorRamp,
@@ -7,508 +6,173 @@ import {
 
 import { CONFIG } from "./config.js";
 import { appState } from "./state.js";
+import { clamp, isConfiguredUrl } from "./utils.js";
 
 import {
   renderRasterList,
+  setLegend,
+  markRasterUnavailable,
 } from "./ui.js";
+
+
+// ============================================================
+// RASTER CONFIGS FOR THE CURRENT STATE
+// ============================================================
+//
+// Kept in the same order as the raster list in the UI.
+// The legend and the map drawing order both follow this order.
+//
+
+let rasterConfigs = [];
+
+
+// ============================================================
+// BUILD CONFIGS
+// ============================================================
+
+function buildRasterConfigs(stateKey) {
+
+  const stateConfig = CONFIG.states[stateKey];
+
+  const configs = [];
+
+  for (const [datasetId, url] of Object.entries(stateConfig?.rasters ?? {})) {
+
+    const dataset = CONFIG.datasets[datasetId];
+
+    if (!dataset) {
+      console.warn(`Dataset "${datasetId}" is not defined in CONFIG.datasets`);
+      continue;
+    }
+
+    if (!isConfiguredUrl(url)) {
+      continue;
+    }
+
+    configs.push({
+      id: `${stateKey.toLowerCase()}-${datasetId}`,
+      datasetId,
+      title: dataset.title,
+      description: dataset.description,
+      url,
+      opacity: dataset.opacity ?? CONFIG.defaults.rasterOpacity,
+      colorRamp: dataset.colorRamp ?? null,
+    });
+  }
+
+  return configs;
+}
+
+
+// ============================================================
+// CREATE ONE LAYER
+// ============================================================
+
+function createRasterLayer(config) {
+
+  const properties = {
+    url: config.url,
+    title: config.title,
+    opacity: config.opacity,
+    visible: false,
+  };
+
+  if (config.colorRamp?.length >= 2) {
+
+    try {
+
+      properties.renderer = {
+        type: "raster-stretch",
+        stretchType: "percent-clip",
+        minPercent: 2,
+        maxPercent: 2,
+        colorRamp: createColorRamp({ colors: config.colorRamp }),
+      };
+
+    } catch (error) {
+
+      console.error(`Failed to create color ramp for ${config.title}:`, error);
+    }
+  }
+
+  return new ImageryTileLayer(properties);
+}
 
 
 // ============================================================
 // LOAD RASTERS FOR STATE
 // ============================================================
 
-export async function loadRastersForState(
-  stateKey
-) {
-
-  console.log(
-    `Loading rasters for ${stateKey}`
-  );
-
-
-  // ----------------------------------------------------------
-  // REMOVE PREVIOUS RASTERS
-  // ----------------------------------------------------------
+export function loadRastersForState(stateKey) {
 
   removeAllRasterLayers();
 
+  rasterConfigs = buildRasterConfigs(stateKey);
 
-  const stateConfig =
-    CONFIG.states[stateKey];
+  for (const config of rasterConfigs) {
 
+    const layer = createRasterLayer(config);
 
-  if (!stateConfig) {
+    appState.rasterLayers.set(config.id, layer);
+    appState.map.add(layer);
 
-    console.warn(
-      "No state configuration found:",
-      stateKey
-    );
+    // If the service can't be reached, tell the user.
+    layer.load().catch((error) => {
 
-    renderRasterList([]);
+      console.error(`Raster failed to load: ${config.title}`, error);
 
-    return;
-  }
-
-
-  // ----------------------------------------------------------
-  // CREATE RASTER CONFIGURATION
-  // ----------------------------------------------------------
-
-  const rasterConfigs =
-    [];
-
-
-  for (
-    const [
-      datasetId,
-      url,
-    ]
-    of Object.entries(
-      stateConfig.rasters ?? {}
-    )
-  ) {
-
-    const dataset =
-      CONFIG.datasets[
-        datasetId
-      ];
-
-
-    if (!dataset) {
-
-      console.warn(
-        `Dataset "${datasetId}" is not defined in CONFIG.datasets`
-      );
-
-      continue;
-    }
-
-
-    if (
-      !url ||
-      url.startsWith("YOUR-")
-    ) {
-
-      console.warn(
-        `No URL configured for ${stateKey} → ${datasetId}`
-      );
-
-      continue;
-    }
-
-
-    rasterConfigs.push({
-
-      id:
-        `${stateKey.toLowerCase()}-${datasetId}`,
-
-      datasetId,
-
-      title:
-        dataset.title,
-
-      description:
-        dataset.description,
-
-      type:
-        dataset.type,
-
-      url,
-
-      opacity:
-        dataset.opacity ?? 0.85,
-
-      colorRamp:
-        dataset.colorRamp ?? null,
+      // Ignore if the user already switched to another state.
+      if (appState.rasterLayers.get(config.id) === layer) {
+        markRasterUnavailable(config.id);
+      }
     });
   }
 
-
-  // ----------------------------------------------------------
-  // CREATE LAYERS
-  // ----------------------------------------------------------
-
-  for (
-    const config
-    of rasterConfigs
-  ) {
-
-    // --------------------------------------------------------
-    // CREATE RENDERER
-    // --------------------------------------------------------
-
-    let renderer =
-      null;
-
-
-    if (
-      config.colorRamp &&
-      config.colorRamp.length >= 2
-    ) {
-
-      try {
-
-        const colorRamp =
-          createColorRamp({
-
-            colors:
-              config.colorRamp,
-
-          });
-
-
-        if (colorRamp) {
-
-          renderer = {
-
-            type:
-              "raster-stretch",
-
-            stretchType: "percent-clip",
-
-            minPercent: 2,
-
-            maxPercent: 2,
-
-            colorRamp,
-
-          };
-        }
-
-      } catch (error) {
-
-        console.error(
-          `Failed to create color ramp for ${config.title}:`,
-          error
-        );
-      }
-    }
-
-
-    // --------------------------------------------------------
-    // CREATE IMAGERY TILE LAYER
-    // --------------------------------------------------------
-
-    const layerProperties = {
-
-      url:
-        config.url,
-
-      opacity:
-        config.opacity,
-
-      visible:
-        false,
-    };
-
-
-    // Only add renderer when a color ramp exists.
-
-    if (renderer) {
-
-      layerProperties.renderer =
-        renderer;
-    }
-
-
-    const layer =
-      new ImageryTileLayer(
-        layerProperties
-      );
-
-
-    appState.rasterLayers.set(
-      config.id,
-      layer
-    );
-
-
-    appState.map.add(
-      layer
-    );
-  }
-
-
-  // ----------------------------------------------------------
-  // CORRECT MAP DRAWING ORDER
-  // ----------------------------------------------------------
-  //
-  // ArcGIS draws later-added layers above earlier-added
-  // layers.
-  //
-  // Therefore:
-  //
-  // UI:
-  //
-  //   Raster A
-  //   Raster B
-  //   Raster C
-  //
-  // MAP:
-  //
-  //   Raster A  ← TOP
-  //   Raster B
-  //   Raster C  ← BOTTOM
-  //
-  // ----------------------------------------------------------
-
-  const layers =
-    rasterConfigs
-      .map(
-        (config) =>
-          appState.rasterLayers.get(
-            config.id
-          )
-      )
-      .filter(
-        (layer) =>
-          layer
-      );
-
-
-  for (
-    let i = 0;
-    i < layers.length;
-    i++
-  ) {
-
-    const layer =
-      layers[i];
-
+  // ArcGIS draws later layers on top. Reverse the order so the
+  // first raster in the list is drawn on top of the others.
+  rasterConfigs.forEach((config, index) => {
 
     appState.map.reorder(
-      layer,
-      layers.length - 1 - i
+      appState.rasterLayers.get(config.id),
+      rasterConfigs.length - 1 - index
     );
-  }
+  });
 
-
-  // ----------------------------------------------------------
-  // RENDER RASTER CONTROLS
-  // ----------------------------------------------------------
-
-  renderRasterList(
-    rasterConfigs
-  );
-
-
-  // ----------------------------------------------------------
-  // NOTHING ACTIVE INITIALLY
-  // ----------------------------------------------------------
-
-  appState.activeRaster =
-    null;
-
-  appState.activeRasterId =
-    null;
-
-
-  clearLegend();
+  renderRasterList(rasterConfigs);
 }
 
 
 // ============================================================
-// SET RASTER VISIBILITY
+// RASTER VISIBILITY + OPACITY
 // ============================================================
 //
-// Each raster is independent.
+// Each raster is independent; several can be on at once.
 //
-// Multiple rasters can be visible simultaneously.
-// ============================================================
 
-export function setActiveRaster(
-  rasterId,
-  visible
-) {
+export function setRasterVisibility(rasterId, visible) {
 
-  console.log(
-    `Raster ${rasterId}: ${
-      visible
-        ? "ON"
-        : "OFF"
-    }`
-  );
-
-
-  const layer =
-    appState.rasterLayers.get(
-      rasterId
-    );
-
+  const layer = appState.rasterLayers.get(rasterId);
 
   if (!layer) {
-
-    console.warn(
-      "Raster layer not found:",
-      rasterId
-    );
-
+    console.warn("Raster layer not found:", rasterId);
     return;
   }
 
-
-  // ----------------------------------------------------------
-  // CHANGE ONLY THIS RASTER
-  // ----------------------------------------------------------
-
-  layer.visible =
-    Boolean(
-      visible
-    );
-
-
-  // ----------------------------------------------------------
-  // UPDATE ACTIVE RASTER REFERENCE
-  // ----------------------------------------------------------
-
-  if (visible) {
-
-    appState.activeRaster =
-      layer;
-
-    appState.activeRasterId =
-      rasterId;
-
-  } else {
-
-    if (
-      appState.activeRasterId ===
-      rasterId
-    ) {
-
-      appState.activeRaster =
-        null;
-
-      appState.activeRasterId =
-        null;
-    }
-  }
-
-
-  // ----------------------------------------------------------
-  // UPDATE LEGEND
-  // ----------------------------------------------------------
+  layer.visible = Boolean(visible);
 
   updateLegend();
 }
 
+export function setRasterOpacity(rasterId, opacity) {
 
-// ============================================================
-// SET RASTER OPACITY
-// ============================================================
-
-export function setRasterOpacity(
-  rasterId,
-  opacity
-) {
-
-  const layer =
-    appState.rasterLayers.get(
-      rasterId
-    );
-
+  const layer = appState.rasterLayers.get(rasterId);
 
   if (!layer) {
-
-    console.warn(
-      "Cannot change opacity. Raster layer not found:",
-      rasterId
-    );
-
+    console.warn("Cannot change opacity. Raster layer not found:", rasterId);
     return;
   }
 
-
-  const safeOpacity =
-    Math.max(
-      0,
-      Math.min(
-        1,
-        Number(
-          opacity
-        )
-      )
-    );
-
-
-  layer.opacity =
-    safeOpacity;
-
-
-  console.log(
-    `Raster ${rasterId} opacity: ${safeOpacity}`
-  );
-}
-
-
-// ============================================================
-// FIND RASTER CONFIG
-// ============================================================
-
-function findRasterConfig(
-  stateKey,
-  rasterId
-) {
-
-  const stateConfig =
-    CONFIG.states[
-      stateKey
-    ];
-
-
-  if (!stateConfig) {
-    return null;
-  }
-
-
-  for (
-    const [
-      datasetId,
-      url,
-    ]
-    of Object.entries(
-      stateConfig.rasters ?? {}
-    )
-  ) {
-
-    const generatedId =
-      `${stateKey.toLowerCase()}-${datasetId}`;
-
-
-    if (
-      generatedId !== rasterId
-    ) {
-
-      continue;
-    }
-
-
-    const dataset =
-      CONFIG.datasets[
-        datasetId
-      ];
-
-
-    if (!dataset) {
-      return null;
-    }
-
-
-    return {
-
-      ...dataset,
-
-      id:
-        generatedId,
-
-      datasetId,
-
-      url,
-    };
-  }
-
-
-  return null;
+  layer.opacity = clamp(Number(opacity), 0, 1);
 }
 
 
@@ -518,29 +182,15 @@ function findRasterConfig(
 
 export function removeAllRasterLayers() {
 
-  for (
-    const layer
-    of appState.rasterLayers.values()
-  ) {
-
-    appState.map.remove(
-      layer
-    );
+  for (const layer of appState.rasterLayers.values()) {
+    appState.map.remove(layer);
   }
-
 
   appState.rasterLayers.clear();
 
+  rasterConfigs = [];
 
-  appState.activeRaster =
-    null;
-
-
-  appState.activeRasterId =
-    null;
-
-
-  clearLegend();
+  setLegend([]);
 }
 
 
@@ -548,177 +198,17 @@ export function removeAllRasterLayers() {
 // LEGEND
 // ============================================================
 //
-// The legend follows the SAME order as the raster list.
+// Shows the visible rasters, in the same order as the list.
 //
-// First raster in list = first/top legend.
-// Last raster in list = last/bottom legend.
-//
-// Only visible rasters are included.
-// ============================================================
 
 function updateLegend() {
 
-  const legendDiv =
-    document.getElementById(
-      "legendDiv"
-    );
+  const layerInfos = rasterConfigs
+    .map((config) => ({
+      layer: appState.rasterLayers.get(config.id),
+      title: config.title,
+    }))
+    .filter(({ layer }) => layer?.visible);
 
-
-  if (!legendDiv) {
-    return;
-  }
-
-
-  const stateKey =
-    appState.selectedState?.key;
-
-
-  if (!stateKey) {
-
-    clearLegend();
-
-    return;
-  }
-
-
-  // ----------------------------------------------------------
-  // GET RASTERS IN CONFIG / UI ORDER
-  // ----------------------------------------------------------
-
-  const stateConfig =
-    CONFIG.states[
-      stateKey
-    ];
-
-
-  if (!stateConfig) {
-
-    clearLegend();
-
-    return;
-  }
-
-
-  const layerInfos =
-    [];
-
-
-  for (
-    const [
-      datasetId,
-      url,
-    ]
-    of Object.entries(
-      stateConfig.rasters ?? {}
-    )
-  ) {
-
-    const rasterId =
-      `${stateKey.toLowerCase()}-${datasetId}`;
-
-
-    const layer =
-      appState.rasterLayers.get(
-        rasterId
-      );
-
-
-    // --------------------------------------------------------
-    // ONLY INCLUDE VISIBLE RASTERS
-    // --------------------------------------------------------
-
-    if (
-      !layer ||
-      !layer.visible
-    ) {
-
-      continue;
-    }
-
-
-    const config =
-      findRasterConfig(
-        stateKey,
-        rasterId
-      );
-
-
-    if (!config) {
-      continue;
-    }
-
-
-    layerInfos.push({
-
-      layer,
-
-      title:
-        config.title,
-
-    });
-  }
-
-
-  // ----------------------------------------------------------
-  // NO VISIBLE RASTERS
-  // ----------------------------------------------------------
-
-  if (
-    layerInfos.length === 0
-  ) {
-
-    clearLegend();
-
-    return;
-  }
-
-
-  // ----------------------------------------------------------
-  // CLEAR PREVIOUS LEGEND
-  // ----------------------------------------------------------
-
-  legendDiv.innerHTML =
-    "";
-
-
-  // ----------------------------------------------------------
-  // CREATE LEGEND
-  // ----------------------------------------------------------
-
-  new Legend({
-
-    view:
-      appState.view,
-
-    container:
-      legendDiv,
-
-    layerInfos,
-
-  });
-}
-
-
-// ============================================================
-// CLEAR LEGEND
-// ============================================================
-
-function clearLegend() {
-
-  const legendDiv =
-    document.getElementById(
-      "legendDiv"
-    );
-
-
-  if (!legendDiv) {
-    return;
-  }
-
-
-  legendDiv.innerHTML = `
-    <div class="empty-state">
-      Turn on a raster layer to view its legend.
-    </div>
-  `;
+  setLegend(layerInfos);
 }

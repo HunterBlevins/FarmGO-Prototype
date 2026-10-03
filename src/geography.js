@@ -4,63 +4,48 @@ import SimpleFillSymbol from "@arcgis/core/symbols/SimpleFillSymbol.js";
 
 import { CONFIG } from "./config.js";
 import { appState } from "./state.js";
+import { escapeSqlValue, createLatestGuard } from "./utils.js";
 
 import {
   populateStateDropdown,
   populateCountyDropdown,
   setCountyEnabled,
-  renderCountyReport,
   clearRasterList,
-  clearFieldLayerList,
 } from "./ui.js";
 
-import {
-  loadRastersForState,
-} from "./rasters.js";
-
-import {
-  loadFieldsForState,
-} from "./fields.js";
-
-import {
-  loadCountyReport,
-} from "./reports/countyReport.js";
+import { loadRastersForState, removeAllRasterLayers } from "./rasters.js";
+import { loadFieldsForState, removeAllFieldLayers } from "./fields.js";
+import { loadCountyReport, clearCountyReport } from "./reports/countyReport.js";
 
 
 // ============================================================
-// SYMBOLS
+// OUTLINE SYMBOLS
 // ============================================================
 
-const stateSymbol =
-  new SimpleFillSymbol({
+function outlineSymbol(color) {
 
-    style:
-      "none",
-
-    outline: {
-      color:
-        [0, 170, 255, 1],
-
-      width:
-        3,
-    },
+  return new SimpleFillSymbol({
+    style: "none",
+    outline: { color, width: 3 },
   });
+}
+
+const stateSymbol = outlineSymbol([0, 170, 255, 1]);
+const countySymbol = outlineSymbol([255, 210, 0, 1]);
+
+const ZOOM_PADDING = { top: 40, bottom: 40, left: 40, right: 40 };
 
 
-const countySymbol =
-  new SimpleFillSymbol({
+// ============================================================
+// RACE PROTECTION
+// ============================================================
+//
+// If the user changes the state/county quickly, only the latest
+// choice is allowed to update the map and the panels.
+//
 
-    style:
-      "none",
-
-    outline: {
-      color:
-        [255, 210, 0, 1],
-
-      width:
-        3,
-    },
-  });
+const stateGuard = createLatestGuard();
+const countyGuard = createLatestGuard();
 
 
 // ============================================================
@@ -69,72 +54,33 @@ const countySymbol =
 
 export async function initializeGeography() {
 
-  // ----------------------------------------------------------
-  // STATES LAYER
-  // ----------------------------------------------------------
+  appState.stateLayer = new FeatureLayer({
+    url: CONFIG.geography.states.url,
+    outFields: ["*"],
+    popupEnabled: false,
+  });
 
-  appState.stateLayer =
-    new FeatureLayer({
-
-      url:
-        CONFIG.geography.states.url,
-
-      outFields:
-        ["*"],
-
-      popupEnabled:
-        false,
-    });
-
-
-  // ----------------------------------------------------------
-  // COUNTIES LAYER
-  // ----------------------------------------------------------
-
-  appState.countyLayer =
-    new FeatureLayer({
-
-      url:
-        CONFIG.geography.counties.url,
-
-      outFields:
-        ["*"],
-
-      popupEnabled:
-        false,
-    });
-
-
-  // ----------------------------------------------------------
-  // LOAD BOTH LAYERS
-  // ----------------------------------------------------------
+  appState.countyLayer = new FeatureLayer({
+    url: CONFIG.geography.counties.url,
+    outFields: ["*"],
+    popupEnabled: false,
+  });
 
   try {
 
     await Promise.all([
-
       appState.stateLayer.load(),
-
       appState.countyLayer.load(),
-
     ]);
+
+    await populateStatesFromLayer();
 
   } catch (error) {
 
-    console.error(
-      "Could not load geography layers:",
-      error
-    );
+    console.error("Could not load geography layers:", error);
 
-    return;
+    populateStateDropdown([], "Could not load states");
   }
-
-
-  // ----------------------------------------------------------
-  // POPULATE STATE DROPDOWN
-  // ----------------------------------------------------------
-
-  await populateStatesFromLayer();
 }
 
 
@@ -144,108 +90,68 @@ export async function initializeGeography() {
 
 async function populateStatesFromLayer() {
 
-  const config =
-    CONFIG.geography.states;
+  const { nameField } = CONFIG.geography.states;
 
+  const result = await appState.stateLayer.queryFeatures({
+    where: "1=1",
+    outFields: [nameField],
+    returnGeometry: false,
+    orderByFields: [`${nameField} ASC`],
+  });
+
+  // The dropdown value is the state NAME, which is also the key
+  // used in CONFIG.states (e.g. "Texas"). Remove duplicates.
+  const names = [
+    ...new Set(
+      result.features
+        .map((feature) => feature.attributes[nameField])
+        .filter(Boolean)
+    ),
+  ];
+
+  populateStateDropdown(names.map((name) => ({ name })));
+}
+
+
+// ============================================================
+// QUERY HELPERS
+// ============================================================
+
+/** Returns the first feature matching `field = value`, or null. */
+async function findFeature(layer, field, value) {
 
   try {
 
-    const result =
-      await appState.stateLayer.queryFeatures({
+    const result = await layer.queryFeatures({
+      where: `${field} = '${escapeSqlValue(value)}'`,
+      outFields: ["*"],
+      returnGeometry: true,
+      num: 1,
+    });
 
-        where:
-          "1=1",
-
-        outFields: [
-
-          config.nameField,
-
-          config.idField,
-
-        ],
-
-        returnGeometry:
-          false,
-
-        orderByFields: [
-
-          `${config.nameField} ASC`,
-
-        ],
-      });
-
-
-    const states =
-      result.features
-
-        .map(
-          (feature) => {
-
-            const name =
-              feature.attributes[
-                config.nameField
-              ];
-
-
-            const id =
-              feature.attributes[
-                config.idField
-              ];
-
-
-            return {
-              name,
-              id,
-            };
-          }
-        )
-
-        .filter(
-          (state) =>
-            state.name
-        );
-
-
-    // --------------------------------------------------------
-    // REMOVE DUPLICATE STATE NAMES
-    // --------------------------------------------------------
-
-    const uniqueStates =
-      Array.from(
-
-        new Map(
-
-          states.map(
-            (state) => [
-
-              state.name,
-
-              state,
-
-            ]
-          )
-
-        ).values()
-
-      );
-
-
-    populateStateDropdown(
-      uniqueStates
-    );
-
-
-    console.log(
-      `Loaded ${uniqueStates.length} states from the States FeatureServer.`
-    );
-
+    return result.features[0] ?? null;
 
   } catch (error) {
 
-    console.error(
-      "Could not populate states:",
-      error
+    console.error(`Query failed for ${field} = ${value}:`, error);
+
+    return null;
+  }
+}
+
+async function zoomTo(geometry) {
+
+  try {
+
+    await appState.view.goTo(
+      { target: geometry, padding: ZOOM_PADDING },
+      { duration: 800 }
     );
+
+  } catch (error) {
+
+    // goTo is rejected when the user interrupts the animation.
+    console.warn("Could not zoom:", error);
   }
 }
 
@@ -253,286 +159,66 @@ async function populateStatesFromLayer() {
 // ============================================================
 // STATE SELECTION
 // ============================================================
-//
-// IMPORTANT:
-//
-// The dropdown value is the STATE NAME.
-//
-// Therefore:
-//
-// "Texas"    -> CONFIG.states["Texas"]
-// "Arizona"  -> CONFIG.states["Arizona"]
-// "Virginia" -> CONFIG.states["Virginia"]
-//
-// No state ID or separate config key is required.
-// ============================================================
 
-export async function selectState(
-  stateName
-) {
+export async function selectState(stateName) {
 
-  // ----------------------------------------------------------
-  // CLEAR SELECTION
-  // ----------------------------------------------------------
+  const isCurrent = stateGuard.next();
+
+  // Anything the previous state put on the map goes away first.
+  clearStateSelection();
 
   if (!stateName) {
-
-    clearStateSelection();
-
     return;
   }
 
+  const stateConfig = CONFIG.states[stateName] ?? null;
 
-  console.log(
-    `Selecting state: ${stateName}`
+  const { nameField, idField } = CONFIG.geography.states;
+
+  const stateFeature = await findFeature(
+    appState.stateLayer,
+    nameField,
+    stateName
   );
 
-
-  // ----------------------------------------------------------
-  // FIND STATE CONFIG BY NAME
-  // ----------------------------------------------------------
-
-  const stateConfig =
-    CONFIG.states[stateName] ??
-    null;
-
-
-  // ----------------------------------------------------------
-  // FIND STATE FEATURE
-  // ----------------------------------------------------------
-
-  const stateFeature =
-    await findStateFeature(
-      stateName
-    );
-
+  if (!isCurrent()) {
+    return;
+  }
 
   if (!stateFeature) {
-
-    console.warn(
-      `Could not find ${stateName} in the States FeatureServer.`
-    );
-
+    console.warn(`Could not find ${stateName} in the States FeatureServer.`);
     return;
   }
 
-
-  // ----------------------------------------------------------
-  // GET STATE ID
-  // ----------------------------------------------------------
-
-  const stateIdField =
-    CONFIG.geography.states.idField;
-
-
-  const stateId =
-    stateFeature.attributes[
-      stateIdField
-    ];
-
-
-  // ----------------------------------------------------------
-  // CLEAR PREVIOUS SELECTION
-  // ----------------------------------------------------------
-
-  clearStateHighlight();
-
-  clearCountySelection();
-
-  clearRasterList();
-
-  clearFieldLayerList();
-
-
-  // ----------------------------------------------------------
-  // STORE SELECTED STATE
-  // ----------------------------------------------------------
+  const stateId = stateFeature.attributes[idField];
 
   appState.selectedState = {
-
-    key:
-      stateName,
-
-    name:
-      stateName,
-
-    id:
-      stateId,
-
-    feature:
-      stateFeature,
-
-    config:
-      stateConfig,
+    key: stateName,
+    name: stateName,
+    id: stateId,
+    feature: stateFeature,
   };
 
+  appState.stateHighlight = addOutline(stateFeature.geometry, stateSymbol);
 
-  appState.currentStateConfig =
-    stateConfig;
+  // Datasets for this state. A state with no configuration simply
+  // ends up with empty lists and a "not configured" message.
+  loadRastersForState(stateName);
+  loadFieldsForState(stateName);
 
-
-  // ----------------------------------------------------------
-  // HIGHLIGHT STATE
-  // ----------------------------------------------------------
-
-  showStateHighlight(
-    stateFeature
-  );
-
-
-  // ----------------------------------------------------------
-  // ZOOM TO STATE
-  // ----------------------------------------------------------
-
-  try {
-
-    await appState.view.goTo(
-
-      {
-        target:
-          stateFeature.geometry,
-
-        padding: {
-
-          top:
-            40,
-
-          bottom:
-            40,
-
-          left:
-            40,
-
-          right:
-            40,
-        },
-      },
-
-      {
-        duration:
-          800,
-      }
-
-    );
-
-  } catch (error) {
-
-    console.warn(
-      "Could not zoom to state:",
-      error
-    );
-  }
-
-
-  // ----------------------------------------------------------
-  // LOAD STATE DATA
-  // ----------------------------------------------------------
-
-  if (stateConfig) {
-
-    console.log(
-      `Loading configured data for ${stateName}`
-    );
-
-
-    // IMPORTANT:
-    //
-    // Pass the STATE NAME because that is now
-    // the key in CONFIG.states.
-
-    loadRastersForState(
-      stateName
-    );
-
-
-    loadFieldsForState(
-      stateName
-    );
-
-  } else {
-
+  if (!stateConfig) {
     console.warn(
       `${stateName} exists in the geography layer but has no data configuration yet.`
     );
-
-
-    populateCountyDropdown(
-      []
-    );
-
-
-    setCountyEnabled(
-      false
-    );
-
-
-    return;
   }
 
+  const zoom = zoomTo(stateFeature.geometry);
 
-  // ----------------------------------------------------------
-  // LOAD COUNTIES
-  // ----------------------------------------------------------
-
-  await loadCounties(
-    stateId
-  );
-}
-
-
-// ============================================================
-// FIND STATE FEATURE
-// ============================================================
-
-async function findStateFeature(
-  stateName
-) {
-
-  const config =
-    CONFIG.geography.states;
-
-
-  const where =
-    `${config.nameField} = '${escapeSqlValue(
-      stateName
-    )}'`;
-
-
-  try {
-
-    const result =
-      await appState.stateLayer.queryFeatures({
-
-        where,
-
-        outFields:
-          ["*"],
-
-        returnGeometry:
-          true,
-      });
-
-
-    if (
-      result.features.length ===
-      0
-    ) {
-
-      return null;
-    }
-
-
-    return result.features[0];
-
-
-  } catch (error) {
-
-    console.error(
-      "State query failed:",
-      error
-    );
-
-    return null;
+  // Counties are only offered for states that have data configured.
+  if (stateConfig) {
+    await Promise.all([zoom, loadCounties(stateId, isCurrent)]);
+  } else {
+    await zoom;
   }
 }
 
@@ -541,102 +227,41 @@ async function findStateFeature(
 // LOAD COUNTIES
 // ============================================================
 
-async function loadCounties(
-  stateId
-) {
+async function loadCounties(stateId, isCurrent) {
 
-  const config =
-    CONFIG.geography.counties;
-
-
-  const where =
-    `${config.stateIdField} = '${escapeSqlValue(
-      stateId
-    )}'`;
-
+  const { stateIdField, nameField, idField } = CONFIG.geography.counties;
 
   try {
 
-    const result =
-      await appState.countyLayer.queryFeatures({
+    const result = await appState.countyLayer.queryFeatures({
+      where: `${stateIdField} = '${escapeSqlValue(stateId)}'`,
+      outFields: [nameField, idField],
+      returnGeometry: false,
+      orderByFields: [`${nameField} ASC`],
+    });
 
-        where,
+    if (!isCurrent()) {
+      return;
+    }
 
-        outFields: [
+    const counties = result.features
+      .map((feature) => ({
+        id: feature.attributes[idField],
+        name: feature.attributes[nameField],
+      }))
+      .filter((county) => county.name);
 
-          config.nameField,
-
-          config.idField,
-
-        ],
-
-        returnGeometry:
-          false,
-
-        orderByFields: [
-
-          `${config.nameField} ASC`,
-
-        ],
-      });
-
-
-    const counties =
-      result.features
-
-        .map(
-          (feature) => ({
-
-            id:
-              feature.attributes[
-                config.idField
-              ],
-
-            name:
-              feature.attributes[
-                config.nameField
-              ],
-
-          })
-        )
-
-        .filter(
-          (county) =>
-            county.name
-        );
-
-
-    populateCountyDropdown(
-      counties
-    );
-
-
-    setCountyEnabled(
-      counties.length > 0
-    );
-
-
-    console.log(
-      `Loaded ${counties.length} counties for ${stateId}.`
-    );
-
+    populateCountyDropdown(counties);
+    setCountyEnabled(counties.length > 0);
 
   } catch (error) {
 
-    console.error(
-      "County query failed:",
-      error
-    );
+    console.error("County query failed:", error);
 
-
-    populateCountyDropdown(
-      []
-    );
-
-
-    setCountyEnabled(
-      false
-    );
+    if (isCurrent()) {
+      populateCountyDropdown([]);
+      setCountyEnabled(false);
+    }
   }
 }
 
@@ -645,324 +270,100 @@ async function loadCounties(
 // COUNTY SELECTION
 // ============================================================
 
-export async function selectCounty(
-  countyId
-) {
+export async function selectCounty(countyId) {
+
+  // Clear first: clearing cancels older requests, so the new
+  // request's guard must be created afterwards.
+  clearCountySelection();
 
   if (!countyId) {
-
-    clearCountySelection();
-
     return;
   }
 
+  const isCurrent = countyGuard.next();
 
-  const config =
-    CONFIG.geography.counties;
+  const { nameField, idField } = CONFIG.geography.counties;
 
+  const feature = await findFeature(appState.countyLayer, idField, countyId);
 
-  const where =
-    `${config.idField} = '${escapeSqlValue(
-      countyId
-    )}'`;
+  if (!isCurrent()) {
+    return;
+  }
 
+  if (!feature) {
+    console.warn("County not found:", countyId);
+    return;
+  }
 
-  try {
+  const countyName = feature.attributes[nameField];
 
-    const result =
-      await appState.countyLayer.queryFeatures({
+  appState.selectedCounty = { id: countyId, name: countyName, feature };
 
-        where,
+  appState.countyHighlight = addOutline(feature.geometry, countySymbol);
 
-        outFields:
-          ["*"],
-
-        returnGeometry:
-          true,
-      });
-
-
-    if (
-      result.features.length ===
-      0
-    ) {
-
-      console.warn(
-        "County not found:",
-        countyId
-      );
-
-      return;
-    }
-
-
-    const feature =
-      result.features[0];
-
-
-    const countyName =
-      feature.attributes[
-        config.nameField
-      ];
-
-
-    // --------------------------------------------------------
-    // STORE COUNTY
-    // --------------------------------------------------------
-
-    appState.selectedCounty = {
-
-      id:
-        countyId,
-
-      name:
-        countyName,
-
-      feature:
-        feature,
-    };
-
-
-    // --------------------------------------------------------
-    // HIGHLIGHT COUNTY
-    // --------------------------------------------------------
-
-    showCountyHighlight(
-      feature
-    );
-
-
-    // --------------------------------------------------------
-    // ZOOM TO COUNTY
-    // --------------------------------------------------------
-
-    try {
-
-      await appState.view.goTo(
-
-        {
-          target:
-            feature.geometry,
-
-          padding: {
-
-            top:
-              40,
-
-            bottom:
-              40,
-
-            left:
-              40,
-
-            right:
-              40,
-          },
-        },
-
-        {
-          duration:
-            800,
-        }
-
-      );
-
-    } catch (error) {
-
-      console.warn(
-        "Could not zoom to county:",
-        error
-      );
-    }
-
-
-    // --------------------------------------------------------
-    // COUNTY REPORT
-    // --------------------------------------------------------
-
-    loadCountyReport(
-
-      countyId,
-
-      countyName,
-
-      appState.selectedState?.name ?? ""
-
-    );
-
-
-      } catch (error) {
-
-        console.error(
-          "County selection failed:",
-          error
-        );
-      }
-    }
-
-
-// ============================================================
-// STATE HIGHLIGHT
-// ============================================================
-
-function showStateHighlight(
-  feature
-) {
-
-  clearStateHighlight();
-
-
-  appState.stateHighlight =
-    new Graphic({
-
-      geometry:
-        feature.geometry,
-
-      symbol:
-        stateSymbol,
-    });
-
-
-  appState.view.graphics.add(
-    appState.stateHighlight
+  // Start the report and the zoom together.
+  loadCountyReport(
+    countyId,
+    countyName,
+    appState.selectedState?.name ?? ""
   );
+
+  await zoomTo(feature.geometry);
 }
 
 
 // ============================================================
-// COUNTY HIGHLIGHT
+// HIGHLIGHT OUTLINES
 // ============================================================
 
-function showCountyHighlight(
-  feature
-) {
+function addOutline(geometry, symbol) {
 
-  clearCountyHighlight();
+  const graphic = new Graphic({ geometry, symbol });
 
+  appState.view.graphics.add(graphic);
 
-  appState.countyHighlight =
-    new Graphic({
+  return graphic;
+}
 
-      geometry:
-        feature.geometry,
+function removeOutline(graphic) {
 
-      symbol:
-        countySymbol,
-    });
-
-
-  appState.view.graphics.add(
-    appState.countyHighlight
-  );
+  if (graphic) {
+    appState.view.graphics.remove(graphic);
+  }
 }
 
 
 // ============================================================
-// CLEAR STATE
+// CLEARING
 // ============================================================
 
+/** Removes everything that belongs to the currently selected state. */
 function clearStateSelection() {
 
-  clearStateHighlight();
+  removeOutline(appState.stateHighlight);
+  appState.stateHighlight = null;
+  appState.selectedState = null;
 
   clearCountySelection();
 
+  // Map layers and their controls (previously these stayed on the
+  // map when a state was deselected or had no configuration).
+  removeAllRasterLayers();
+  removeAllFieldLayers();
   clearRasterList();
 
-  clearFieldLayerList();
-
-
-  appState.selectedState =
-    null;
-
-
-  appState.currentStateConfig =
-    null;
-
-
-  populateCountyDropdown(
-    []
-  );
-
-
-  setCountyEnabled(
-    false
-  );
+  populateCountyDropdown([]);
+  setCountyEnabled(false);
 }
-
-
-// ============================================================
-// CLEAR COUNTY
-// ============================================================
 
 function clearCountySelection() {
 
-  clearCountyHighlight();
+  // Cancel any county request that is still running.
+  countyGuard.cancel();
 
+  removeOutline(appState.countyHighlight);
+  appState.countyHighlight = null;
+  appState.selectedCounty = null;
 
-  appState.selectedCounty =
-    null;
-
-
-  renderCountyReport(
-    null
-  );
-}
-
-
-// ============================================================
-// CLEAR STATE HIGHLIGHT
-// ============================================================
-
-function clearStateHighlight() {
-
-  if (
-    appState.stateHighlight
-  ) {
-
-    appState.view.graphics.remove(
-      appState.stateHighlight
-    );
-
-
-    appState.stateHighlight =
-      null;
-  }
-}
-
-
-// ============================================================
-// CLEAR COUNTY HIGHLIGHT
-// ============================================================
-
-function clearCountyHighlight() {
-
-  if (
-    appState.countyHighlight
-  ) {
-
-    appState.view.graphics.remove(
-      appState.countyHighlight
-    );
-
-
-    appState.countyHighlight =
-      null;
-  }
-}
-
-
-// ============================================================
-// SQL ESCAPING
-// ============================================================
-
-function escapeSqlValue(
-  value
-) {
-
-  return String(value)
-    .replaceAll(
-      "'",
-      "''"
-    );
+  clearCountyReport();
 }

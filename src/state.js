@@ -1,57 +1,26 @@
+// ============================================================
+// SHARED APPLICATION STATE
+// ============================================================
+
 export const appState = {
-  // ==========================================================
-  // MAP
-  // ==========================================================
 
+  // Map
   map: null,
-
   view: null,
 
-
-  // ==========================================================
-  // GEOGRAPHY
-  // ==========================================================
-
+  // Geography
   stateLayer: null,
-
   countyLayer: null,
-
   selectedState: null,
-
   selectedCounty: null,
-
   stateHighlight: null,
-
   countyHighlight: null,
 
-
-  // ==========================================================
-  // RASTERS
-  // ==========================================================
-
-  activeRaster: null,
-
+  // Rasters (id -> ImageryTileLayer)
   rasterLayers: new Map(),
 
-  activeRasterId: null,
-
-
-  // ==========================================================
-  // FIELDS
-  // ==========================================================
-
-  activeFieldLayer: null,
-
+  // Fields (id -> FeatureLayer)
   fieldLayers: new Map(),
-
-  activeFieldLayerId: null,
-
+  activeFieldLayer: null,
   selectedField: null,
-
-
-  // ==========================================================
-  // CURRENT STATE CONFIGURATION
-  // ==========================================================
-
-  currentStateConfig: null,
 };

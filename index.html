@@ -10,6 +10,11 @@
       content="width=device-width, initial-scale=1.0"
     />
 
+    <meta
+      name="description"
+      content="FarmGO: an agricultural data dashboard with county reports, raster datasets and field boundaries."
+    />
+
     <title>
       FarmGO
     </title>
@@ -29,7 +34,7 @@
 
         <img
           id="logo"
-          src="%BASE_URL%FarmGOLogo.png">
+          src="%BASE_URL%FarmGOLogo.png"
           alt="FarmGO logo"
         />
 
@@ -214,15 +219,16 @@
 
 
           <div
-            id="legendDiv"
-            class="legend-container"
+            id="legendEmpty"
+            class="empty-state"
           >
-
-            <div class="empty-state">
-              Select a raster layer.
-            </div>
-
+            Turn on a raster layer to view its legend.
           </div>
+
+          <arcgis-legend
+            id="legend"
+            hidden
+          ></arcgis-legend>
 
         </section>
 
@@ -292,6 +298,7 @@
           <div
             id="countyReport"
             class="report-content"
+            aria-live="polite"
           >
 
             <div class="empty-state">
@@ -323,6 +330,7 @@
             <button
               id="clearFieldButton"
               type="button"
+              title="Deselect the field and clear its attributes"
             >
               Clear
             </button>
