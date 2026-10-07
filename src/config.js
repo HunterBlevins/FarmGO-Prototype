@@ -308,7 +308,7 @@ states: {
           "FTW Field Boundaries",
 
         url:
-          "https://services3.arcgis.com/0OPQIK59PJJqLK0A/arcgis/rest/services/FTW_2025/FeatureServer/4",
+          "https://services3.arcgis.com/0OPQIK59PJJqLK0A/arcgis/rest/services/TexasFields_FTW_2025/FeatureServer",
       },
 
 

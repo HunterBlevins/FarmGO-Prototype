@@ -10,6 +10,8 @@ import {
   setFieldOpacityUI,
 } from "./ui.js";
 
+import { loadFieldReport, clearFieldReport } from "./fieldReports/fieldReport.js";
+
 
 // ============================================================
 // SELECTED FIELD HIGHLIGHT
@@ -174,6 +176,7 @@ export function initializeFieldClick() {
       selectedFieldHighlight = layerView.highlight(graphic);
 
       renderFieldAttributes(graphic.attributes);
+      loadFieldReport(graphic.attributes);
 
     } catch (error) {
 
@@ -206,4 +209,5 @@ export function clearFieldSelection() {
   appState.selectedField = null;
 
   renderFieldAttributes(null);
+  clearFieldReport();
 }
