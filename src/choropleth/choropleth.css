@@ -1,0 +1,92 @@
+/* Styles for the field choropleth demo. Delete with the folder. */
+
+#choroplethSection .choropleth-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+
+  border-radius: 8px;
+
+  background: #fef3c7;
+  color: #92400e;
+
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+#choroplethSection .choropleth-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+
+  margin-bottom: 10px;
+
+  cursor: pointer;
+}
+
+#choroplethSection .choropleth-toggle input {
+  margin-top: 2px;
+}
+
+#choroplethSection .choropleth-toggle strong {
+  display: block;
+
+  font-size: 13px;
+  font-weight: 600;
+  color: #222;
+}
+
+#choroplethSection .choropleth-toggle small {
+  display: block;
+
+  margin-top: 3px;
+
+  color: #777;
+  font-size: 11px;
+  font-weight: 400;
+  line-height: 1.35;
+}
+
+#choroplethStatus {
+  margin-bottom: 12px;
+}
+
+#choroplethStatus:empty {
+  display: none;
+}
+
+#choroplethStatus.error {
+  color: #b42318;
+}
+
+#choroplethSection .choropleth-gap {
+  margin-top: 14px;
+}
+
+.choropleth-legend {
+  margin-top: 14px;
+
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+
+  font-size: 12px;
+}
+
+.choropleth-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.choropleth-swatch {
+  flex: 0 0 auto;
+
+  width: 18px;
+  height: 12px;
+
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 2px;
+}

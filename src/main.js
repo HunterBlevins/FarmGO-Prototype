@@ -5,6 +5,7 @@ import { appState } from "./state.js";
 import { CONFIG } from "./config.js";
 import { initializeUI } from "./ui.js";
 import { makePanelResizable } from "./panelResize.js";
+import { initializeChoropleth } from "./choropleth/choropleth.js";
 
 import {
   initializeGeography,
@@ -52,6 +53,7 @@ async function main() {
 
   // Map interaction
   initializeFieldClick();
+  initializeChoropleth();
 
   // Resizable panels
   makePanelResizable({
