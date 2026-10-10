@@ -20,8 +20,9 @@ export function createMap() {
     popupEnabled: false,
   });
 
-  // Connect the web components to the view.
-  for (const id of ["mapSearch", "mapCompass", "legend"]) {
+  // Connect the web components to the view. (Raster legends are
+  // created per raster in ui.js.)
+  for (const id of ["mapSearch", "mapCompass"]) {
 
     const component = document.getElementById(id);
 

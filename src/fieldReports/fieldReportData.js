@@ -12,7 +12,8 @@ import { FIELD_REPORT_CONFIG as CONFIG } from "./fieldReportConfig.js";
 // results are read page by page.
 //
 
-const PAGE_SIZE = 100;
+// Asks for this many rows; the service may return fewer.
+const PAGE_SIZE = 1000;
 const MAX_PAGES = 100;
 
 // table url -> FeatureLayer
@@ -83,8 +84,16 @@ async function fetchFieldStatistics(tableUrl, fieldId) {
       where: `${c.fieldId} = '${escapeSqlValue(fieldId)}'`,
       outFields: [c.fieldId, c.start, c.period, c.variable, c.value],
       returnGeometry: false,
-      orderByFields: [`${c.start} ASC`, `${c.period} ASC`, `${c.variable} ASC`],
-      start: page * PAGE_SIZE,
+      // The object id breaks ties, so paging never skips or repeats rows.
+      orderByFields: [
+        `${c.start} ASC`,
+        `${c.period} ASC`,
+        `${c.variable} ASC`,
+        `${table.objectIdField} ASC`,
+      ],
+      // Continue from the rows actually received: a service that
+      // returns fewer than PAGE_SIZE would otherwise lose rows.
+      start: records.length,
       num: PAGE_SIZE,
     });
 

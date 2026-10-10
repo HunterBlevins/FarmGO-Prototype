@@ -2,8 +2,14 @@ import "./choropleth.css";
 
 import { appState } from "../state.js";
 import { escapeHtml, createLatestGuard } from "../utils.js";
-import { FIELD_REPORT_CONFIG as TABLE } from "../fieldReports/fieldReportConfig.js";
 import { CHOROPLETH_CONFIG as CONFIG } from "./choroplethConfig.js";
+
+import {
+  describeVariable,
+  sortVariables,
+  sortPeriods,
+  capitalize,
+} from "../reports/variables.js";
 
 import {
   getStatisticsTableUrl,
@@ -19,16 +25,29 @@ import {
   legendHtml,
 } from "./choroplethRenderer.js";
 
+import {
+  onFieldContextChange,
+  setActiveFieldLayerVisible,
+} from "../fields.js";
+
 
 // ============================================================
-// FIELD CHOROPLETH (DEMO)
+// VISUALIZE BY VARIABLES
 // ============================================================
 //
-// Adds a "Field Choropleth" section to the left panel. With a
-// county and a field layer selected, the toggle shades every
-// field in that county by one variable on one date.
+// The "Visualize by variables" button sits under the Field Layer
+// dropdown. Clicking it swaps the field boundaries for the same
+// fields shaded by one variable on one date, and shows the
+// variable, time scale and date slider. Clicking it again goes
+// back to the boundaries.
+//
+// Only one of the two is ever on the map: the field layer is
+// hidden when the shaded fields appear and shown again when they
+// go.
 //
 
+const BUTTON_LABEL = "Visualize by variables";
+const BUTTON_LABEL_ACTIVE = "Stop visualizing";
 
 const state = {
   enabled: false,
@@ -52,23 +71,26 @@ const byId = (id) => document.getElementById(id);
 
 export function initializeChoropleth() {
 
-  if (!buildSection()) {
+  const button = byId("visualizeButton");
+
+  if (!button) {
+    console.warn("visualizeButton not found; visualization disabled.");
     return;
   }
 
-  byId("choroplethToggle").addEventListener("change", (event) =>
-    event.target.checked ? turnOn() : turnOff()
+  button.addEventListener("click", () =>
+    state.enabled ? turnOff() : turnOn()
   );
 
-  byId("choroplethVariable").addEventListener("change", (event) =>
+  byId("visualizeVariable").addEventListener("change", (event) =>
     selectVariable(event.target.value)
   );
 
-  byId("choroplethPeriod").addEventListener("change", (event) =>
+  byId("visualizePeriod").addEventListener("change", (event) =>
     selectPeriod(event.target.value)
   );
 
-  const dateSlider = byId("choroplethDate");
+  const dateSlider = byId("visualizeDate");
 
   // Moving the slider only updates the label; the map is
   // redrawn when the slider is released.
@@ -79,106 +101,15 @@ export function initializeChoropleth() {
 
   dateSlider.addEventListener("change", render);
 
-  const opacitySlider = byId("choroplethOpacity");
-
-  opacitySlider.addEventListener("input", () => {
-    byId("choroplethTransparencyValue").textContent = `${opacitySlider.value}%`;
-    setChoroplethOpacity(1 - Number(opacitySlider.value) / 100);
+  // The shaded fields belong to one county + one field layer.
+  // When either changes, drop them (the field code has already
+  // put the right layer back on the map).
+  onFieldContextChange(() => {
+    deactivate();
+    refreshAvailability();
   });
 
-  // The choropleth belongs to one county + one field layer, so
-  // it switches off whenever one of these dropdowns changes.
-  // (These listeners are added after the app's own, so the
-  // app has already updated its state when they run.)
-  for (const id of ["stateSelect", "countySelect", "fieldLayerSelect"]) {
-    byId(id)?.addEventListener("change", () => {
-      turnOff();
-      refreshAvailability();
-    });
-  }
-
   refreshAvailability();
-}
-
-function buildSection() {
-
-  const panel = byId("leftPanel");
-
-  if (!panel) {
-    console.warn("leftPanel not found; choropleth demo disabled.");
-    return false;
-  }
-
-  const initialTransparency = Math.round((1 - CONFIG.opacity) * 100);
-
-  const section = document.createElement("section");
-
-  section.id = "choroplethSection";
-  section.className = "panel-section";
-
-  section.innerHTML = `
-    <h2>Field Choropleth <span class="choropleth-tag">demo</span></h2>
-
-    <label class="choropleth-toggle">
-      <input type="checkbox" id="choroplethToggle" disabled />
-      <span>
-        <strong>Color fields by value</strong>
-        <small>
-          Shades every field in the selected county by one
-          variable on one date.
-        </small>
-      </span>
-    </label>
-
-    <div id="choroplethStatus" class="empty-state" role="status"></div>
-
-    <div id="choroplethControls" hidden>
-
-      <label for="choroplethVariable">Variable</label>
-      <select id="choroplethVariable"></select>
-
-      <div id="choroplethPeriodRow">
-        <label for="choroplethPeriod">Time scale</label>
-        <select id="choroplethPeriod"></select>
-      </div>
-
-      <div class="opacity-header">
-        <span>Date</span>
-        <span id="choroplethDateLabel"></span>
-      </div>
-      <input
-        type="range"
-        id="choroplethDate"
-        class="opacity-slider"
-        aria-label="Date"
-        min="0" max="0" step="1" value="0"
-      />
-      <div class="opacity-labels">
-        <span id="choroplethDateMin"></span>
-        <span id="choroplethDateMax"></span>
-      </div>
-
-      <div class="opacity-header choropleth-gap">
-        <span>Transparency</span>
-        <span id="choroplethTransparencyValue">${initialTransparency}%</span>
-      </div>
-      <input
-        type="range"
-        id="choroplethOpacity"
-        class="opacity-slider"
-        aria-label="Choropleth transparency"
-        min="0" max="100" step="1"
-        value="${initialTransparency}"
-      />
-
-      <div id="choroplethLegend" class="choropleth-legend"></div>
-
-    </div>
-  `;
-
-  panel.appendChild(section);
-
-  return true;
 }
 
 
@@ -186,32 +117,30 @@ function buildSection() {
 // AVAILABILITY
 // ============================================================
 
-const getCountyId = () => byId("countySelect")?.value ?? "";
-
 function refreshAvailability() {
 
-  const toggle = byId("choroplethToggle");
+  const button = byId("visualizeButton");
 
-  if (!toggle || state.enabled) {
+  if (!button || state.enabled) {
     return;
   }
 
   let hint = "";
 
-  if (!getCountyId()) {
+  if (!appState.selectedCounty) {
     hint = "Select a county to use this.";
   } else if (!appState.activeFieldLayer) {
     hint = "Choose a field layer to use this.";
   }
 
-  toggle.disabled = Boolean(hint);
+  button.disabled = Boolean(hint);
 
   setStatus(hint);
 }
 
 function setStatus(message, isError = false) {
 
-  const status = byId("choroplethStatus");
+  const status = byId("visualizeStatus");
 
   if (status) {
     status.textContent = message;
@@ -226,10 +155,10 @@ function setStatus(message, isError = false) {
 
 async function turnOn() {
 
-  const countyId = getCountyId();
+  const countyId = appState.selectedCounty?.id;
 
   if (!countyId || !appState.activeFieldLayer) {
-    return abort("");
+    return;
   }
 
   if (!getStatisticsTableUrl()) {
@@ -243,7 +172,12 @@ async function turnOn() {
   state.enabled = true;
   state.countyId = countyId;
 
-  byId("choroplethControls").hidden = true;
+  const button = byId("visualizeButton");
+
+  button.textContent = BUTTON_LABEL_ACTIVE;
+  button.setAttribute("aria-pressed", "true");
+
+  byId("visualizeControls").hidden = true;
   setStatus("Loading available variables…");
 
   const isCurrent = guard.next();
@@ -262,13 +196,13 @@ async function turnOn() {
 
     state.options = options;
 
-    byId("choroplethControls").hidden = false;
+    byId("visualizeControls").hidden = false;
 
     populateVariables();
 
   } catch (error) {
 
-    console.error("Choropleth setup failed:", error);
+    console.error("Visualization setup failed:", error);
 
     if (isCurrent()) {
       abort(`Could not load the variables: ${error.message}`, true);
@@ -276,41 +210,53 @@ async function turnOn() {
   }
 }
 
-/** Switch the feature off and leave a message. */
+/** The user switched it off: the field boundaries come back. */
+function turnOff() {
+
+  deactivate();
+
+  setActiveFieldLayerVisible(true);
+
+  refreshAvailability();
+}
+
+/** Switch it off and leave a message. */
 function abort(message, isError = false) {
 
   turnOff();
-  refreshAvailability();
 
   if (message) {
     setStatus(message, isError);
   }
 }
 
-function turnOff() {
+/**
+ * Removes the shaded fields and resets the controls. Does NOT touch
+ * the field layer: whoever calls this decides what is drawn next.
+ */
+function deactivate() {
 
   guard.cancel();
 
   state.enabled = false;
   state.options = null;
 
-  const toggle = byId("choroplethToggle");
+  appState.visualizing = false;
 
-  if (toggle) {
-    toggle.checked = false;
+  const button = byId("visualizeButton");
+
+  if (button) {
+    button.textContent = BUTTON_LABEL;
+    button.setAttribute("aria-pressed", "false");
   }
 
-  const controls = byId("choroplethControls");
+  const controls = byId("visualizeControls");
 
   if (controls) {
     controls.hidden = true;
   }
 
-  const legend = byId("choroplethLegend");
-
-  if (legend) {
-    legend.replaceChildren();
-  }
+  byId("visualizeLegend")?.replaceChildren();
 
   clearChoropleth();
 }
@@ -322,11 +268,10 @@ function turnOff() {
 
 function populateVariables() {
 
-  const select = byId("choroplethVariable");
+  const select = byId("visualizeVariable");
 
-  const variables = [...state.options.keys()].sort((a, b) =>
-    describeVariable(a).label.localeCompare(describeVariable(b).label)
-  );
+  // Same order as the reports.
+  const variables = sortVariables([...state.options.keys()]);
 
   select.innerHTML = variables.map((variable) => `
     <option value="${escapeHtml(variable)}">
@@ -341,20 +286,18 @@ function selectVariable(variable) {
 
   state.variable = variable;
 
-  byId("choroplethVariable").value = variable;
+  byId("visualizeVariable").value = variable;
 
   // Time scales available for this variable, preferred first.
-  const periods = [...state.options.get(variable).keys()].sort(
-    (a, b) => periodRank(a) - periodRank(b) || a.localeCompare(b)
-  );
+  const periods = sortPeriods([...state.options.get(variable).keys()]);
 
-  byId("choroplethPeriod").innerHTML = periods.map((period) => `
+  byId("visualizePeriod").innerHTML = periods.map((period) => `
     <option value="${escapeHtml(period)}">
       ${escapeHtml(capitalize(period) || "Unspecified")}
     </option>
   `).join("");
 
-  byId("choroplethPeriodRow").hidden = periods.length < 2;
+  byId("visualizePeriodRow").hidden = periods.length < 2;
 
   selectPeriod(periods[0]);
 }
@@ -363,21 +306,21 @@ function selectPeriod(period) {
 
   state.period = period;
 
-  byId("choroplethPeriod").value = period;
+  byId("visualizePeriod").value = period;
 
   state.times = state.options.get(state.variable).get(period);
 
   // Start on the most recent date.
   state.timeIndex = state.times.length - 1;
 
-  const slider = byId("choroplethDate");
+  const slider = byId("visualizeDate");
 
   slider.max = String(state.times.length - 1);
   slider.value = String(state.timeIndex);
   slider.disabled = state.times.length < 2;
 
-  byId("choroplethDateMin").textContent = formatDate(state.times[0]);
-  byId("choroplethDateMax").textContent = formatDate(state.times.at(-1));
+  byId("visualizeDateMin").textContent = formatDate(state.times[0]);
+  byId("visualizeDateMax").textContent = formatDate(state.times.at(-1));
 
   updateDateLabel();
 
@@ -386,7 +329,7 @@ function selectPeriod(period) {
 
 function updateDateLabel() {
 
-  byId("choroplethDateLabel").textContent = formatDate(
+  byId("visualizeDateLabel").textContent = formatDate(
     state.times[state.timeIndex]
   );
 }
@@ -424,7 +367,18 @@ async function render() {
 
     const { scheme, matched, total } = drawChoropleth(shapes, values);
 
-    byId("choroplethLegend").innerHTML = legendHtml(
+    // The one transparency slider controls whatever is drawn.
+    setChoroplethOpacity(appState.activeFieldLayer?.opacity ?? CONFIG.opacity);
+
+    if (!appState.visualizing) {
+
+      // First draw: swap the field boundaries for the shaded
+      // fields, so only one of them is on the map.
+      appState.visualizing = true;
+      setActiveFieldLayerVisible(false);
+    }
+
+    byId("visualizeLegend").innerHTML = legendHtml(
       scheme,
       describeVariable(variable).unit
     );
@@ -445,65 +399,18 @@ async function render() {
 
   } catch (error) {
 
-    console.error("Choropleth failed:", error);
+    console.error("Visualization failed:", error);
 
     if (isCurrent()) {
-      setStatus(`Could not build the choropleth: ${error.message}`, true);
+      setStatus(`Could not visualize the fields: ${error.message}`, true);
     }
   }
 }
 
 
 // ============================================================
-// LABELS
+// FORMATTING
 // ============================================================
-//
-// Reuses the labels and units from fieldReportConfig.js.
-//
-
-function describeVariable(raw) {
-
-  const key = String(raw).trim().toLowerCase();
-
-  const info = TABLE.variables[key];
-
-  if (info) {
-    return { label: info.label, unit: info.unit ?? "" };
-  }
-
-  for (const group of TABLE.groups) {
-
-    const series = group.series.find((s) => s.variable === key);
-
-    if (series) {
-      return {
-        label: `${group.title} (${series.name})`,
-        unit: group.unit ?? "",
-      };
-    }
-  }
-
-  return { label: prettify(String(raw)), unit: "" };
-}
-
-function periodRank(period) {
-
-  const index = TABLE.preferredPeriods.indexOf(String(period).toLowerCase());
-
-  return index === -1 ? Infinity : index;
-}
-
-function capitalize(text) {
-
-  return text ? text.charAt(0).toUpperCase() + text.slice(1) : "";
-}
-
-function prettify(name) {
-
-  return name
-    .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
 
 /** Dates are stored in UTC; show them as stored. */
 function formatDate(ms) {

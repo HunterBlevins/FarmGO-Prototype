@@ -342,10 +342,17 @@ select:disabled {
 }
 
 /* ============================================================
-   LEGEND
+   RASTER LEGENDS (under each raster)
    ============================================================ */
 
-arcgis-legend {
+.raster-legend {
+  margin-top: 10px;
+  padding-top: 8px;
+
+  border-top: 1px solid #e7e8ea;
+}
+
+.raster-legend arcgis-legend {
   display: block;
 }
 
@@ -432,6 +439,212 @@ arcgis-legend {
   background: #fef3f2;
   color: #b42318;
   font-size: 13px;
+}
+
+/* ============================================================
+   COMPARISON REPORT
+   ("Change from last: Week | Month | Year | Historical Norm")
+   ============================================================ */
+
+.compare-bar {
+  display: flex;
+  flex-wrap: wrap; /* only wraps when the panel is dragged narrow */
+  align-items: center;
+  gap: 8px 6px;
+
+  margin-bottom: 12px;
+}
+
+.compare-label {
+  color: #333;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.compare-tabs {
+  display: inline-flex;
+
+  border: 1px solid #c9ccd0;
+  border-radius: 6px;
+
+  overflow: hidden;
+}
+
+.compare-tab {
+  padding: 5px 6px;
+
+  border: 0;
+  border-left: 1px solid #c9ccd0;
+
+  background: #fff;
+  color: #444;
+
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+
+  cursor: pointer;
+}
+
+.compare-tab:first-child {
+  border-left: 0;
+}
+
+.compare-tab:hover {
+  background: #f3f4f5;
+}
+
+.compare-tab.active {
+  background: #1d4ed8;
+  color: #fff;
+}
+
+.compare-period-label {
+  display: block;
+
+  margin: 0 0 12px;
+
+  color: #555;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.compare-period-label select {
+  margin: 4px 0 0;
+}
+
+.compare-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.compare-item {
+  border: 1px solid #e0e1e3;
+  border-radius: 6px;
+
+  overflow: hidden;
+}
+
+/* The row is a button, so it works with keyboard and screen readers. */
+.compare-row {
+  display: block;
+  width: 100%;
+
+  padding: 8px 10px 8px 12px;
+
+  border: 0;
+  border-left: 4px solid #d5d7da;
+
+  background: #f7f7f8;
+  color: inherit;
+
+  font: inherit;
+  text-align: left;
+
+  cursor: pointer;
+}
+
+.compare-row.tinted {
+  border-left-color: var(--row-edge);
+  background: var(--row-bg);
+}
+
+.compare-row:hover {
+  filter: brightness(0.97);
+}
+
+.compare-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.compare-name {
+  flex: 1;
+  min-width: 0;
+
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.compare-delta {
+  font-size: 12px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-chevron {
+  flex: 0 0 auto;
+
+  width: 7px;
+  height: 7px;
+
+  border-right: 2px solid #555;
+  border-bottom: 2px solid #555;
+
+  transform: rotate(-45deg);
+  transition: transform 0.15s;
+}
+
+.compare-row[aria-expanded="true"] .compare-chevron {
+  transform: rotate(45deg);
+}
+
+.compare-values {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 8px;
+
+  margin-top: 3px;
+
+  color: #444;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.compare-values b {
+  color: #111;
+}
+
+.compare-arrow {
+  color: #777;
+}
+
+.compare-chart {
+  border-top: 1px solid #e0e1e3;
+
+  background: #fff;
+}
+
+/* The chart card is already inside a bordered row. */
+.compare-chart .report-chart-card {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.compare-chart .report-chart-title {
+  font-size: 16px;
+}
+
+.compare-chart .report-chart-subtitle {
+  font-size: 12px;
+}
+
+.compare-note {
+  margin-top: 10px;
+
+  color: #777;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.compare-note:empty {
+  display: none;
 }
 
 /* ============================================================

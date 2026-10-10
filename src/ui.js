@@ -250,6 +250,8 @@ export function renderRasterList(rasters) {
 
         </div>
 
+        <div class="raster-legend" hidden></div>
+
       </div>
     `;
 
@@ -306,30 +308,36 @@ export function markRasterUnavailable(rasterId) {
 
 
 // ============================================================
-// LEGEND
+// RASTER LEGENDS
 // ============================================================
 //
-// `layerInfos` is an array of { layer, title } for the visible
-// rasters. An empty array shows the placeholder message.
+// Each raster has its own legend directly under its controls,
+// shown only while that raster is switched on. The legend element
+// is created the first time it is needed.
 //
 
-export function setLegend(layerInfos) {
+export function setRasterLegend(rasterId, { layer, title, view, visible }) {
 
-  const legend = byId("legend");
-  const empty = byId("legendEmpty");
+  const holder = byId("rasterList")?.querySelector(
+    `.raster-option[data-raster-id="${CSS.escape(rasterId)}"] .raster-legend`
+  );
 
-  if (!legend || !empty) {
+  if (!holder) {
     return;
   }
 
-  const hasLayers = layerInfos.length > 0;
+  holder.hidden = !visible;
 
-  if (hasLayers) {
-    legend.layerInfos = layerInfos;
+  if (!visible || holder.firstElementChild) {
+    return;
   }
 
-  legend.hidden = !hasLayers;
-  empty.hidden = hasLayers;
+  const legend = document.createElement("arcgis-legend");
+
+  legend.view = view;
+  legend.layerInfos = [{ layer, title }];
+
+  holder.append(legend);
 }
 
 
@@ -338,13 +346,36 @@ export function setLegend(layerInfos) {
 // ============================================================
 
 /** Pass an empty array to reset the dropdown. */
-export function renderFieldLayerList(fields) {
+export function renderFieldLayerList(
+  fields,
+  placeholder = "Select a field layer..."
+) {
 
   fillSelect(
     "fieldLayerSelect",
-    "Select a field layer...",
+    placeholder,
     (fields ?? []).map((field) => ({ value: field.id, label: field.title }))
   );
+}
+
+export function setFieldLayerEnabled(enabled) {
+
+  const select = byId("fieldLayerSelect");
+
+  if (select) {
+    select.disabled = !enabled;
+  }
+}
+
+/** A short message under the field layer dropdown ("" hides it). */
+export function setFieldLayerNote(message = "") {
+
+  const note = byId("fieldLayerNote");
+
+  if (note) {
+    note.textContent = message;
+    note.hidden = !message;
+  }
 }
 
 export function setFieldOpacityUI(opacity) {

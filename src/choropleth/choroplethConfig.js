@@ -17,6 +17,10 @@ export const CHOROPLETH_CONFIG = {
   // in both the statistics table and the field boundary layer.
   // (Index the column in both for speed.)
   //
+  // The same attribute filters the field layers themselves: once
+  // a county is chosen, only that county's fields are offered
+  // and drawn.
+  //
 
   // Column in the statistics table.
   countyIdColumn: "COUNTY_ID",

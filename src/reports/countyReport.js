@@ -1,5 +1,5 @@
-import { getCountyClimateData } from "./reportData.js";
-import { createTimeSeriesChart, createTemperatureChart } from "./reportCharts.js";
+import { getCountyStatistics } from "./reportData.js";
+import { renderComparisonReport, createReportUiState } from "./reportView.js";
 import { escapeHtml, createLatestGuard } from "../utils.js";
 
 
@@ -11,6 +11,10 @@ const getContainer = () => document.getElementById("countyReport");
 
 // Only the most recently requested county may update the panel.
 const reportGuard = createLatestGuard();
+
+// This report's own tab / time scale / open charts. Kept apart
+// from the field report's, so each can be set independently.
+const ui = createReportUiState();
 
 
 // ============================================================
@@ -57,13 +61,22 @@ export async function loadCountyReport(countyId, countyName, stateName) {
 
   try {
 
-    const climate = await getCountyClimateData(countyId);
+    const records = await getCountyStatistics(countyId);
 
     if (!isCurrent()) {
       return;
     }
 
-    renderCountyReport(container, { countyId, countyName, stateName, climate });
+    const headerHtml = `
+      <div class="report-header">
+        <h3 class="report-county">${escapeHtml(countyName)}</h3>
+        <div class="report-id">
+          ${stateName ? `${escapeHtml(stateName)} · ` : ""}GEOID ${escapeHtml(countyId)}
+        </div>
+      </div>
+    `;
+
+    renderComparisonReport(container, { headerHtml, records, ui });
 
   } catch (error) {
 
@@ -77,61 +90,4 @@ export async function loadCountyReport(countyId, countyName, stateName) {
       `;
     }
   }
-}
-
-
-// ============================================================
-// RENDER COUNTY REPORT
-// ============================================================
-
-function renderCountyReport(container, { countyId, countyName, stateName, climate }) {
-
-  container.innerHTML = `
-    <div class="county-report">
-
-      <div class="report-header">
-        <h3 class="report-county">${escapeHtml(countyName)}</h3>
-        <div class="report-id">
-          ${stateName ? `${escapeHtml(stateName)} · ` : ""}GEOID ${escapeHtml(countyId)}
-        </div>
-      </div>
-
-      <div class="report-section">
-        <div id="countyPrecipitationChart" class="report-chart"></div>
-      </div>
-
-      <div class="report-section">
-        <div id="countyTemperatureChart" class="report-chart"></div>
-      </div>
-
-      <div class="report-section">
-        <div id="countyDewPointChart" class="report-chart"></div>
-      </div>
-
-    </div>
-  `;
-
-  createTimeSeriesChart(
-    container.querySelector("#countyPrecipitationChart"),
-    climate.ppt,
-    {
-      title: "Precipitation",
-      yAxisLabel: "Precipitation",
-    }
-  );
-
-  createTemperatureChart(
-    container.querySelector("#countyTemperatureChart"),
-    climate
-  );
-
-  createTimeSeriesChart(
-    container.querySelector("#countyDewPointChart"),
-    climate.tdmean,
-    {
-      title: "Dew Point",
-      yAxisLabel: "Mean dew point",
-      valueSuffix: "°",
-    }
-  );
 }

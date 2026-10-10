@@ -41,6 +41,12 @@ function getLayer() {
   return layer;
 }
 
+/** The layer the shapes are drawn on, or null if nothing is drawn. */
+export function getChoroplethLayer() {
+
+  return layer && appState.map.layers.includes(layer) ? layer : null;
+}
+
 export function clearChoropleth() {
 
   if (!layer) {

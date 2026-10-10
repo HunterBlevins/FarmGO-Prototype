@@ -2,6 +2,7 @@ import FeatureLayer from "@arcgis/core/layers/FeatureLayer.js";
 
 import { appState } from "../state.js";
 import { escapeSqlValue, isConfiguredUrl } from "../utils.js";
+import { countyClause } from "../countyFilter.js";
 import { FIELD_REPORT_CONFIG as TABLE } from "../fieldReports/fieldReportConfig.js";
 import { CHOROPLETH_CONFIG as CONFIG } from "./choroplethConfig.js";
 
@@ -73,40 +74,6 @@ export function getStatisticsTableUrl() {
 // ============================================================
 // QUERY HELPERS
 // ============================================================
-
-/**
- * "COUNTY_ID = '48221'" for the given layer or table. The value
- * is quoted only if the column is text, so both text and number
- * columns work. The layer must be loaded.
- */
-function countyClause(layer, columnName, countyId, what) {
-
-  const field = layer.fields.find(
-    (f) => f.name.toLowerCase() === columnName.toLowerCase()
-  );
-
-  if (!field) {
-    throw new Error(
-      `The ${what} has no "${columnName}" column. ` +
-      `Set it in choroplethConfig.js. ` +
-      `Available: ${layer.fields.map((f) => f.name).join(", ")}`
-    );
-  }
-
-  const value = String(CONFIG.countyIdValue({ countyId }));
-
-  if (field.type === "string") {
-    return `${field.name} = '${escapeSqlValue(value)}'`;
-  }
-
-  if (!Number.isFinite(Number(value))) {
-    throw new Error(
-      `"${field.name}" is numeric but the county value "${value}" is not.`
-    );
-  }
-
-  return `${field.name} = ${Number(value)}`;
-}
 
 function equalsClause(column, value) {
 

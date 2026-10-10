@@ -1,71 +1,68 @@
-/* Styles for the field choropleth demo. Delete with the folder. */
+/* Styles for "Visualize by variables" (left panel, under the field layer). */
 
-#choroplethSection .choropleth-tag {
-  margin-left: 6px;
-  padding: 1px 6px;
+#visualizeButton {
+  display: block;
+  width: 100%;
 
-  border-radius: 8px;
+  margin-top: 14px;
+  padding: 9px 12px;
 
-  background: #fef3c7;
-  color: #92400e;
+  border: 1px solid #1d6b3a;
+  border-radius: 5px;
 
-  font-size: 10px;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  vertical-align: middle;
-}
+  background: #1d6b3a;
+  color: #fff;
 
-#choroplethSection .choropleth-toggle {
-  display: flex;
-  align-items: flex-start;
-  gap: 9px;
-
-  margin-bottom: 10px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
 
   cursor: pointer;
 }
 
-#choroplethSection .choropleth-toggle input {
-  margin-top: 2px;
+#visualizeButton:hover:not(:disabled) {
+  background: #18592f;
 }
 
-#choroplethSection .choropleth-toggle strong {
-  display: block;
-
-  font-size: 13px;
-  font-weight: 600;
-  color: #222;
+/* Active: offered as "Stop visualizing". */
+#visualizeButton[aria-pressed="true"] {
+  background: #fff;
+  color: #1d6b3a;
 }
 
-#choroplethSection .choropleth-toggle small {
-  display: block;
-
-  margin-top: 3px;
-
-  color: #777;
-  font-size: 11px;
-  font-weight: 400;
-  line-height: 1.35;
+#visualizeButton[aria-pressed="true"]:hover:not(:disabled) {
+  background: #eef6f0;
 }
 
-#choroplethStatus {
-  margin-bottom: 12px;
+#visualizeButton:disabled {
+  border-color: #c9ccd0;
+  background: #f4f4f4;
+  color: #999;
+
+  cursor: not-allowed;
 }
 
-#choroplethStatus:empty {
+#visualizeStatus {
+  margin-top: 8px;
+}
+
+#visualizeStatus:empty {
   display: none;
 }
 
-#choroplethStatus.error {
+#visualizeStatus.error {
   color: #b42318;
 }
 
-#choroplethSection .choropleth-gap {
-  margin-top: 14px;
+#visualizeControls {
+  margin-top: 12px;
 }
 
-.choropleth-legend {
+.field-layer-note {
+  margin: -8px 0 14px;
+}
+
+.visualize-legend {
   margin-top: 14px;
 
   display: flex;

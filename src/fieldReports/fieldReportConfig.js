@@ -85,23 +85,33 @@ export const FIELD_REPORT_CONFIG = {
   // unit is appended directly after each number, so include a
   // leading space if you want one (" mm").
   //
-  // Order here = order of the charts.
+  // Row order comes from variableOrder below.
   //
 
+  // higherIsBetter: false flips the report colours for that
+  // variable (higher = red, lower = green). Default is true.
+
   variables: {
+    ndvi:   { label: "NDVI",          unit: "" },
     ppt:    { label: "Precipitation", unit: "" },
     tdmean: { label: "Dew Point",     subtitle: "Mean dew point", unit: "°" },
   },
 
 
+  // Order of the rows in the reports (and the variable dropdown).
+  // Variables not listed come after these, alphabetically.
+
+  variableOrder: ["ndvi", "ppt", "tmin", "tmean", "tmax", "tdmean"],
+
+
   // ----------------------------------------------------------
-  // COMBINED CHARTS
+  // VARIABLE GROUPS
   // ----------------------------------------------------------
   //
-  // Variables listed together are drawn on ONE chart with a
-  // legend (like the county temperature chart). A group is
-  // used only if at least one of its variables exists for the
-  // field. Remove or edit these to match your VARIABLE values.
+  // Gives related variables a shared name, unit and line colour
+  // in the reports (e.g. "Temperature (Minimum)"). Each variable
+  // still gets its own row and chart. Edit these to match your
+  // VARIABLE values.
   //
 
   groups: [
@@ -118,7 +128,7 @@ export const FIELD_REPORT_CONFIG = {
   ],
 
 
-  // Colours for variables that are not in `groups`.
+  // Chart colours for variables that are not in `groups`.
   palette: [
     "#2563eb", "#059669", "#7c3aed", "#db2777",
     "#0891b2", "#ca8a04", "#4b5563",

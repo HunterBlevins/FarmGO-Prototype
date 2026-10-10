@@ -158,6 +158,11 @@ function drawChart(container, config) {
     maxValue += padding;
   }
 
+  // Small ranges (e.g. NDVI, 0 - 1) need more decimals than 72.4°.
+  const span = maxValue - minValue;
+  const axisDecimals = span >= 5 ? 1 : span >= 0.5 ? 2 : 3;
+  const tipDecimals = span >= 5 ? 1 : 3;
+
   const x = (time) =>
     minTime === maxTime
       ? MARGIN.left + plotWidth / 2
@@ -185,7 +190,7 @@ function drawChart(container, config) {
             class="chart-grid-line" />
       <text x="${MARGIN.left - 8}" y="${lineY + 4}"
             class="chart-axis-label" text-anchor="end">
-        ${formatNumber(value)}${escapeHtml(unit)}
+        ${formatNumber(value, axisDecimals)}${escapeHtml(unit)}
       </text>
     `;
   }
@@ -241,7 +246,7 @@ function drawChart(container, config) {
 
     for (const p of s.points) {
 
-      const label = `${s.name ? `${s.name} — ` : ""}${formatDate(p.time, "full")}: ${formatNumber(p.value)}${unit}`;
+      const label = `${s.name ? `${s.name} — ` : ""}${formatDate(p.time, "full")}: ${formatNumber(p.value, tipDecimals)}${unit}`;
 
       points += `
         <circle cx="${x(p.time)}" cy="${y(p.value)}"
@@ -404,7 +409,7 @@ function formatDate(time, style) {
   return date.toLocaleDateString("en-US", { ...options, timeZone: "UTC" });
 }
 
-function formatNumber(value) {
+function formatNumber(value, decimals = 1) {
 
-  return Number.isFinite(Number(value)) ? Number(value).toFixed(1) : "";
+  return Number.isFinite(Number(value)) ? Number(value).toFixed(decimals) : "";
 }

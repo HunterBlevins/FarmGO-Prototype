@@ -136,13 +136,24 @@
           </label>
 
 
-          <select id="fieldLayerSelect">
+          <select
+            id="fieldLayerSelect"
+            disabled
+          >
 
             <option value="">
-              Select a field layer...
+              Select a county first...
             </option>
 
           </select>
+
+
+          <div
+            id="fieldLayerNote"
+            class="empty-state field-layer-note"
+            role="status"
+            hidden
+          ></div>
 
 
           <!-- ==============================================
@@ -192,6 +203,92 @@
 
           </div>
 
+
+          <!-- ==============================================
+               VISUALIZE BY VARIABLES
+
+               Replaces the field boundaries with the fields
+               shaded by one variable on one date. Only one of
+               the two is drawn at a time.
+               ============================================== -->
+
+          <button
+            id="visualizeButton"
+            type="button"
+            aria-pressed="false"
+            disabled
+          >
+            Visualize by variables
+          </button>
+
+
+          <div
+            id="visualizeStatus"
+            class="empty-state"
+            role="status"
+          ></div>
+
+
+          <div
+            id="visualizeControls"
+            hidden
+          >
+
+            <label for="visualizeVariable">
+              Variable
+            </label>
+
+            <select id="visualizeVariable"></select>
+
+
+            <div id="visualizePeriodRow">
+
+              <label for="visualizePeriod">
+                Time scale
+              </label>
+
+              <select id="visualizePeriod"></select>
+
+            </div>
+
+
+            <div class="opacity-header">
+
+              <span>
+                Date
+              </span>
+
+              <span id="visualizeDateLabel"></span>
+
+            </div>
+
+            <input
+              type="range"
+              id="visualizeDate"
+              class="opacity-slider"
+              aria-label="Date"
+              min="0"
+              max="0"
+              step="1"
+              value="0"
+            />
+
+            <div class="opacity-labels">
+
+              <span id="visualizeDateMin"></span>
+
+              <span id="visualizeDateMax"></span>
+
+            </div>
+
+
+            <div
+              id="visualizeLegend"
+              class="visualize-legend"
+            ></div>
+
+          </div>
+
         </section>
 
 
@@ -210,32 +307,6 @@
             id="rasterList"
             class="layer-list"
           ></div>
-
-        </section>
-
-
-        <!-- ================================================
-             LEGEND
-             ================================================ -->
-
-        <section class="panel-section">
-
-          <h2>
-            Legend
-          </h2>
-
-
-          <div
-            id="legendEmpty"
-            class="empty-state"
-          >
-            Turn on a raster layer to view its legend.
-          </div>
-
-          <arcgis-legend
-            id="legend"
-            hidden
-          ></arcgis-legend>
 
         </section>
 
@@ -313,6 +384,33 @@
             </div>
 
           </div>
+
+        </section>
+
+
+        <!-- ================================================
+             FIELD REPORT
+
+             Same layout as the county report, but kept as its
+             own section. Hidden until a field is selected.
+             ================================================ -->
+
+        <section
+          id="fieldReportSection"
+          class="panel-section"
+          hidden
+        >
+
+          <h2>
+            Field Report
+          </h2>
+
+
+          <div
+            id="fieldReport"
+            class="report-content"
+            aria-live="polite"
+          ></div>
 
         </section>
 

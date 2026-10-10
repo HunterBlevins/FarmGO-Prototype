@@ -23,4 +23,8 @@ export const appState = {
   fieldLayers: new Map(),
   activeFieldLayer: null,
   selectedField: null,
+
+  // True while the fields are drawn as a variable choropleth. The
+  // field layer is hidden then: only one of the two is on the map.
+  visualizing: false,
 };

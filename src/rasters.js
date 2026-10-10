@@ -10,7 +10,7 @@ import { clamp, isConfiguredUrl } from "./utils.js";
 
 import {
   renderRasterList,
-  setLegend,
+  setRasterLegend,
   markRasterUnavailable,
 } from "./ui.js";
 
@@ -20,7 +20,7 @@ import {
 // ============================================================
 //
 // Kept in the same order as the raster list in the UI.
-// The legend and the map drawing order both follow this order.
+// The map drawing order follows this order.
 //
 
 let rasterConfigs = [];
@@ -160,7 +160,13 @@ export function setRasterVisibility(rasterId, visible) {
 
   layer.visible = Boolean(visible);
 
-  updateLegend();
+  // The raster's legend sits under the raster in the list.
+  setRasterLegend(rasterId, {
+    layer,
+    title: rasterConfigs.find((config) => config.id === rasterId)?.title,
+    view: appState.view,
+    visible: layer.visible,
+  });
 }
 
 export function setRasterOpacity(rasterId, opacity) {
@@ -189,26 +195,4 @@ export function removeAllRasterLayers() {
   appState.rasterLayers.clear();
 
   rasterConfigs = [];
-
-  setLegend([]);
-}
-
-
-// ============================================================
-// LEGEND
-// ============================================================
-//
-// Shows the visible rasters, in the same order as the list.
-//
-
-function updateLegend() {
-
-  const layerInfos = rasterConfigs
-    .map((config) => ({
-      layer: appState.rasterLayers.get(config.id),
-      title: config.title,
-    }))
-    .filter(({ layer }) => layer?.visible);
-
-  setLegend(layerInfos);
 }

@@ -12,42 +12,37 @@ const countyStatisticsLayer = new FeatureLayer({
   url: CONFIG.reports.countyStatisticsUrl,
 });
 
-const CLIMATE_VARIABLES = ["ppt", "tmin", "tmean", "tmax", "tdmean"];
-
 // Services return a limited number of rows per request, so
 // large result sets are read page by page.
 const PAGE_SIZE = 1000;
-const MAX_PAGES = 50;
+const MAX_PAGES = 200;
 
-// geoid -> Promise of grouped data (avoids re-querying a county
-// the user has already opened).
+// geoid -> Promise of records (avoids re-querying a county the
+// user has already opened).
 const cache = new Map();
 
 
-function emptyGroups() {
-
-  return Object.fromEntries(CLIMATE_VARIABLES.map((name) => [name, []]));
-}
-
-
 // ============================================================
-// GET COUNTY CLIMATE DATA
+// GET COUNTY STATISTICS
 // ============================================================
 //
-// Returns { ppt: [], tmin: [], tmean: [], tmax: [], tdmean: [] }
-// where each array holds the records for that variable, oldest
-// first.
+// Returns an array of records for every variable in the table:
+//
+//   { START, VALUE, PERIOD, VARIABLE }
+//
+// PERIOD and VARIABLE are trimmed and lower-cased (the same
+// shape the field statistics use), oldest first.
 //
 
-export function getCountyClimateData(geoid) {
+export function getCountyStatistics(geoid) {
 
   if (!geoid) {
-    return Promise.resolve(emptyGroups());
+    return Promise.resolve([]);
   }
 
   if (!cache.has(geoid)) {
 
-    const request = fetchCountyClimateData(geoid).catch((error) => {
+    const request = fetchCountyStatistics(geoid).catch((error) => {
 
       // Don't cache failures; let the user try again.
       cache.delete(geoid);
@@ -62,7 +57,7 @@ export function getCountyClimateData(geoid) {
 }
 
 
-async function fetchCountyClimateData(geoid) {
+async function fetchCountyStatistics(geoid) {
 
   // The layer must be loaded to know its object id field name.
   await countyStatisticsLayer.load();
@@ -75,30 +70,29 @@ async function fetchCountyClimateData(geoid) {
 
     const result = await countyStatisticsLayer.queryFeatures({
       where: `GEOID = '${escapeSqlValue(geoid)}'`,
-      outFields: ["GEOID", "START", "END_", "PERIOD", "VARIABLE", "VALUE"],
+      outFields: ["GEOID", "START", "PERIOD", "VARIABLE", "VALUE"],
       returnGeometry: false,
       orderByFields: ["START ASC", `${objectIdField} ASC`], // stable paging
       start: page * PAGE_SIZE,
       num: PAGE_SIZE,
     });
 
-    records.push(...result.features.map((feature) => feature.attributes));
+    for (const feature of result.features) {
+
+      const a = feature.attributes;
+
+      records.push({
+        START: a.START,
+        VALUE: a.VALUE,
+        PERIOD: String(a.PERIOD ?? "").trim().toLowerCase(),
+        VARIABLE: String(a.VARIABLE ?? "").trim().toLowerCase(),
+      });
+    }
 
     if (!result.exceededTransferLimit || result.features.length === 0) {
       break;
     }
   }
 
-  const grouped = emptyGroups();
-
-  for (const record of records) {
-
-    const variable = String(record.VARIABLE ?? "").toLowerCase();
-
-    if (variable in grouped) {
-      grouped[variable].push(record);
-    }
-  }
-
-  return grouped;
+  return records;
 }

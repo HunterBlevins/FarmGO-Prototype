@@ -14,7 +14,12 @@ import {
 } from "./ui.js";
 
 import { loadRastersForState, removeAllRasterLayers } from "./rasters.js";
-import { loadFieldsForState, removeAllFieldLayers } from "./fields.js";
+import {
+  loadFieldsForState,
+  removeAllFieldLayers,
+  showFieldsForCounty,
+  clearFieldCounty,
+} from "./fields.js";
 import { loadCountyReport, clearCountyReport } from "./reports/countyReport.js";
 
 
@@ -301,6 +306,11 @@ export async function selectCounty(countyId) {
 
   appState.countyHighlight = addOutline(feature.geometry, countySymbol);
 
+  // Fields are only offered once a county is chosen, and only that
+  // county's fields. (Runs in the background; the dropdown fills
+  // in when it is ready.)
+  showFieldsForCounty(countyId);
+
   // Start the report and the zoom together.
   loadCountyReport(
     countyId,
@@ -365,5 +375,6 @@ function clearCountySelection() {
   appState.countyHighlight = null;
   appState.selectedCounty = null;
 
+  clearFieldCounty();
   clearCountyReport();
 }
