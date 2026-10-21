@@ -1,6 +1,7 @@
-/* Styles for "Visualize by variables" (left panel, under the field layer). */
+/* Styles for "Visualize fields / counties" (left panel, under the field layer). */
 
-#visualizeButton {
+#visualizeButton,
+#visualizeCountiesButton {
   display: block;
   width: 100%;
 
@@ -20,21 +21,25 @@
   cursor: pointer;
 }
 
-#visualizeButton:hover:not(:disabled) {
+#visualizeButton:hover:not(:disabled),
+#visualizeCountiesButton:hover:not(:disabled) {
   background: #18592f;
 }
 
 /* Active: offered as "Stop visualizing". */
-#visualizeButton[aria-pressed="true"] {
+#visualizeButton[aria-pressed="true"],
+#visualizeCountiesButton[aria-pressed="true"] {
   background: #fff;
   color: #1d6b3a;
 }
 
-#visualizeButton[aria-pressed="true"]:hover:not(:disabled) {
+#visualizeButton[aria-pressed="true"]:hover:not(:disabled),
+#visualizeCountiesButton[aria-pressed="true"]:hover:not(:disabled) {
   background: #eef6f0;
 }
 
-#visualizeButton:disabled {
+#visualizeButton:disabled,
+#visualizeCountiesButton:disabled {
   border-color: #c9ccd0;
   background: #f4f4f4;
   color: #999;
@@ -42,10 +47,19 @@
   cursor: not-allowed;
 }
 
+#visualizeCountiesButton {
+  margin-top: 8px;
+}
+
+.visualize-hint {
+  margin-top: 6px;
+}
+
 #visualizeStatus {
   margin-top: 8px;
 }
 
+.visualize-hint:empty,
 #visualizeStatus:empty {
   display: none;
 }
@@ -86,4 +100,33 @@
 
   border: 1px solid rgba(0, 0, 0, 0.25);
   border-radius: 2px;
+}
+
+
+/* Change-from-norm legend: one red -> green bar instead of classes. */
+
+.choropleth-legend-title {
+  font-weight: 600;
+}
+
+.choropleth-ramp {
+  height: 12px;
+
+  border: 1px solid rgba(0, 0, 0, 0.25);
+  border-radius: 2px;
+}
+
+.choropleth-ramp-labels {
+  display: flex;
+  justify-content: space-between;
+
+  margin-top: -2px;
+
+  font-size: 11px;
+}
+
+.choropleth-ramp-meaning {
+  margin-top: -3px;
+
+  color: #666;
 }

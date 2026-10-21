@@ -4,6 +4,7 @@ import { renderComparisonReport, createReportUiState } from "../reports/reportVi
 
 import { FIELD_REPORT_CONFIG as CONFIG } from "./fieldReportConfig.js";
 import { getFieldStatistics } from "./fieldReportData.js";
+import { getCountyStatistics } from "../reports/reportData.js";
 
 
 // ============================================================
@@ -128,7 +129,13 @@ export async function loadFieldReport(attributes) {
 
   try {
 
-    const records = await getFieldStatistics(tableUrl, fieldId);
+    // The county's numbers are drawn on the field's charts for
+    // comparison. They are optional: if they cannot be loaded the
+    // report simply has no county line.
+    const [records, countyRecords] = await Promise.all([
+      getFieldStatistics(tableUrl, fieldId),
+      loadCountyRecords(),
+    ]);
 
     if (!isCurrent()) {
       return;
@@ -141,7 +148,15 @@ export async function loadFieldReport(attributes) {
       </div>
     `;
 
-    renderComparisonReport(container, { headerHtml, records, ui });
+    renderComparisonReport(container, {
+      headerHtml,
+      records,
+      ui,
+      seriesName: "Field",
+      reference: countyRecords.length > 0
+        ? { name: "County", records: countyRecords }
+        : null,
+    });
 
   } catch (error) {
 
@@ -156,6 +171,28 @@ export async function loadFieldReport(attributes) {
         </div>
       `;
     }
+  }
+}
+
+
+// ============================================================
+// COUNTY COMPARISON DATA
+// ============================================================
+
+/** Statistics of the selected county (cached), or [] if unavailable. */
+async function loadCountyRecords() {
+
+  const countyId = appState.selectedCounty?.id;
+
+  if (!countyId) {
+    return [];
+  }
+
+  try {
+    return await getCountyStatistics(countyId);
+  } catch (error) {
+    console.warn("County statistics unavailable for the field report:", error);
+    return [];
   }
 }
 

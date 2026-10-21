@@ -41,13 +41,13 @@ geography: {
   states: {
 
     url:
-      "https://services3.arcgis.com/0OPQIK59PJJqLK0A/arcgis/rest/services/FarmGoInitialStates/FeatureServer",
+      "https://services3.arcgis.com/0OPQIK59PJJqLK0A/arcgis/rest/services/FG_Tiger/FeatureServer",
 
     nameField:
-      "STATE_NAME",
+      "NAME",
 
     idField:
-      "STATE_FIPS",
+      "STATEFP",
   },
 
 
@@ -443,7 +443,7 @@ states: {
 reports: {
 
   countyStatisticsUrl:
-    "https://services3.arcgis.com/0OPQIK59PJJqLK0A/arcgis/rest/services/CountyStatistics/FeatureServer",
+    "https://services3.arcgis.com/0OPQIK59PJJqLK0A/arcgis/rest/services/CountyStatisticsUpdated/FeatureServer",
 },
 
 };

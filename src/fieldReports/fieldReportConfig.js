@@ -73,6 +73,12 @@ export const FIELD_REPORT_CONFIG = {
 
   preferredPeriods: ["weekly", "monthly", "daily"],
 
+  // Historical rows use the current period's name with this word in
+  // front: "monthly" -> "historical monthly". They are not offered
+  // as a time scale; they feed the historical-average line on the
+  // charts and the choropleth's change from normal.
+  historicalPrefix: "historical",
+
 
   // ----------------------------------------------------------
   // VARIABLE LABELS
@@ -91,10 +97,22 @@ export const FIELD_REPORT_CONFIG = {
   // higherIsBetter: false flips the report colours for that
   // variable (higher = red, lower = green). Default is true.
 
+  // Units are imperial, matching the tables: temperatures in °F,
+  // precipitation in inches.
+
   variables: {
     ndvi:   { label: "NDVI",          unit: "" },
-    ppt:    { label: "Precipitation", unit: "" },
-    tdmean: { label: "Dew Point",     subtitle: "Mean dew point", unit: "°" },
+    ppt:    { label: "Precipitation", unit: " in" },
+    tdmean: { label: "Dew Point",     subtitle: "Mean dew point", unit: "°F" },
+  },
+
+
+  // Full wording for the y axis of a chart, keyed by the unit text
+  // above (trimmed). Units not listed are shown as they are.
+
+  unitNames: {
+    "°F": "Degrees Fahrenheit (°F)",
+    "in": "Inches (in)",
   },
 
 
@@ -118,7 +136,7 @@ export const FIELD_REPORT_CONFIG = {
     {
       title: "Temperature",
       subtitle: "Minimum, mean, and maximum temperature",
-      unit: "°",
+      unit: "°F",
       series: [
         { variable: "tmin",  name: "Minimum", color: "#2563eb" },
         { variable: "tmean", name: "Mean",    color: "#f59e0b" },

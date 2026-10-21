@@ -207,9 +207,11 @@
           <!-- ==============================================
                VISUALIZE BY VARIABLES
 
-               Replaces the field boundaries with the fields
-               shaded by one variable on one date. Only one of
-               the two is drawn at a time.
+               Shades the chosen county's fields, or every
+               county of the chosen state, by how far one
+               variable on one date is from its historical
+               norm. Only one is on at a time; fields replace
+               the field boundaries.
                ============================================== -->
 
           <button
@@ -218,8 +220,28 @@
             aria-pressed="false"
             disabled
           >
-            Visualize by variables
+            Visualize fields
           </button>
+
+          <div
+            id="visualizeFieldsHint"
+            class="empty-state visualize-hint"
+          ></div>
+
+
+          <button
+            id="visualizeCountiesButton"
+            type="button"
+            aria-pressed="false"
+            disabled
+          >
+            Visualize counties
+          </button>
+
+          <div
+            id="visualizeCountiesHint"
+            class="empty-state visualize-hint"
+          ></div>
 
 
           <div

@@ -1,6 +1,7 @@
 import { escapeHtml } from "../utils.js";
 import { createLineChart } from "./reportCharts.js";
 import { COMPARISONS, groupRecords, compareSeries } from "./comparison.js";
+import { splitRecords, buildHistoricalSeries } from "./historical.js";
 import { FIELD_REPORT_CONFIG as CONFIG } from "../fieldReports/fieldReportConfig.js";
 
 import {
@@ -8,6 +9,7 @@ import {
   sortVariables,
   sortPeriods,
   variableColor,
+  axisLabelFor,
   capitalize,
 } from "./variables.js";
 
@@ -27,12 +29,20 @@ import {
 // the stronger the colour. Clicking a row opens that variable's
 // chart under it; clicking again closes it.
 //
+// An open chart also shows the variable's historical average and,
+// when the report is given a `reference` (a field report is given
+// its county), that reference's line too, both semi-transparent.
+//
 // Each report keeps its own `ui` object (see createReportUiState),
 // so the county report and the field report stay independent.
 //
 
 const GREEN = "22, 163, 74";
 const RED = "220, 38, 38";
+
+// Context lines on the charts (see openChart).
+const HISTORICAL_LINE = { name: "Historical average", color: "#6b7280" };
+const REFERENCE_LINE_COLOR = "#0d9488";
 
 
 /** Settings that survive moving from one county / field to the next. */
@@ -52,12 +62,27 @@ export function createReportUiState() {
 //
 // headerHtml: the heading (name + id) shown above the controls.
 // records:    [{ START, VALUE, PERIOD, VARIABLE }] (PERIOD and
-//             VARIABLE trimmed + lower-case).
+//             VARIABLE trimmed + lower-case). Rows whose PERIOD is
+//             "historical ..." are the historical averages; they
+//             are not rows of the report.
+// seriesName: what the report's own line is called in the chart
+//             legend ("County", "Field").
+// reference:  optional { name, records } drawn as a second context
+//             line, e.g. { name: "County", records: countyRecords }.
 //
 
-export function renderComparisonReport(container, { headerHtml, records, ui }) {
+export function renderComparisonReport(
+  container,
+  { headerHtml, records, ui, seriesName = "", reference = null }
+) {
 
-  if (records.length === 0) {
+  const { current, historical } = splitRecords(records);
+
+  const referenceData = reference
+    ? { name: reference.name, ...splitRecords(reference.records) }
+    : null;
+
+  if (current.length === 0) {
 
     container.innerHTML = `
       ${headerHtml}
@@ -71,7 +96,7 @@ export function renderComparisonReport(container, { headerHtml, records, ui }) {
 
   // --- Time scale -----------------------------------------
 
-  const periods = sortPeriods([...new Set(records.map((r) => r.PERIOD))]);
+  const periods = sortPeriods([...new Set(current.map((r) => r.PERIOD))]);
 
   if (!periods.includes(ui.period)) {
     ui.period =
@@ -123,7 +148,34 @@ export function renderComparisonReport(container, { headerHtml, records, ui }) {
   const note = container.querySelector(".compare-note");
   const tabs = [...container.querySelectorAll(".compare-tab")];
 
-  let groups = groupRecords(records, ui.period);
+  // What the charts need for the chosen time scale.
+  let groups;
+  let referenceGroups;
+
+  const loadGroups = () => {
+
+    groups = groupRecords(current, ui.period);
+
+    for (const [variable, group] of groups) {
+      group.historical = buildHistoricalSeries(
+        historical, variable, ui.period, group.points
+      );
+    }
+
+    referenceGroups = referenceData
+      ? groupRecords(referenceData.current, ui.period)
+      : null;
+  };
+
+  // Everything openChart needs, in one place.
+  const chartContext = () => ({
+    groups,
+    referenceGroups,
+    seriesName,
+    referenceName: referenceData?.name ?? "",
+  });
+
+  loadGroups();
 
   const draw = () => {
 
@@ -135,7 +187,7 @@ export function renderComparisonReport(container, { headerHtml, records, ui }) {
       tab.setAttribute("aria-pressed", String(active));
     }
 
-    drawRows(list, note, groups, ui);
+    drawRows(list, note, chartContext(), ui);
   };
 
   // --- Events ---------------------------------------------
@@ -153,7 +205,7 @@ export function renderComparisonReport(container, { headerHtml, records, ui }) {
   container.querySelector(".compare-period")?.addEventListener("change", (event) => {
 
     ui.period = event.target.value;
-    groups = groupRecords(records, ui.period);
+    loadGroups();
     draw();
   });
 
@@ -173,7 +225,7 @@ export function renderComparisonReport(container, { headerHtml, records, ui }) {
       closeChart(item);
     } else {
       ui.expanded.add(name);
-      openChart(item, name, groups, ui);
+      openChart(item, name, chartContext(), ui);
     }
   });
 
@@ -185,7 +237,9 @@ export function renderComparisonReport(container, { headerHtml, records, ui }) {
 // ROWS
 // ============================================================
 
-function drawRows(list, note, groups, ui) {
+function drawRows(list, note, context, ui) {
+
+  const { groups } = context;
 
   const comparison = COMPARISONS.find((c) => c.id === ui.comparison);
 
@@ -203,7 +257,9 @@ function drawRows(list, note, groups, ui) {
 
   list.innerHTML = names.map((name) => {
 
-    const result = compareSeries(groups.get(name).points, comparison);
+    const group = groups.get(name);
+
+    const result = compareSeries(group.points, comparison, group.historical);
 
     return rowHtml(name, result, comparison, ui.expanded.has(name));
 
@@ -217,7 +273,7 @@ function drawRows(list, note, groups, ui) {
   for (const item of list.querySelectorAll(".compare-item")) {
 
     if (ui.expanded.has(item.dataset.variable)) {
-      openChart(item, item.dataset.variable, groups, ui);
+      openChart(item, item.dataset.variable, context, ui);
     }
   }
 }
@@ -298,6 +354,10 @@ function tooltip(result, comparison) {
 
     parts.push(`No ${comparison.label.toLowerCase()} data to compare with.`);
 
+  } else if (comparison.id === "norm" && result.normSource === "historical") {
+
+    parts.push("Historical norm: the historical average for this time of year.");
+
   } else if (comparison.id === "norm") {
 
     parts.push(
@@ -318,7 +378,9 @@ function tooltip(result, comparison) {
 // CHARTS
 // ============================================================
 
-function openChart(item, name, groups, ui) {
+function openChart(item, name, context, ui) {
+
+  const { groups, referenceGroups, seriesName, referenceName } = context;
 
   const target = item.querySelector(".compare-chart");
   const group = groups.get(name);
@@ -336,15 +398,42 @@ function openChart(item, name, groups, ui) {
 
   const index = sortVariables([...groups.keys()]).indexOf(name);
 
+  // Context lines first, then the main line (drawn last, on top).
+  const series = [];
+
+  if (group.historical?.length > 0) {
+    series.push({
+      name: HISTORICAL_LINE.name,
+      color: HISTORICAL_LINE.color,
+      records: group.historical,
+      reference: true,
+      dashed: true,
+    });
+  }
+
+  const referenceGroup = referenceGroups?.get(name);
+
+  if (referenceGroup) {
+    series.push({
+      name: referenceName,
+      color: REFERENCE_LINE_COLOR,
+      records: referenceGroup.records,
+      reference: true,
+    });
+  }
+
+  series.push({
+    name: seriesName,
+    color: variableColor(name, index),
+    records: group.records,
+  });
+
   createLineChart(target, {
     title: info.label,
     subtitle: capitalize(ui.period),
     unit: info.unit,
-    series: [{
-      name: "", // single series: the title already says it
-      color: variableColor(name, index),
-      records: group.records,
-    }],
+    axisLabel: axisLabelFor(name),
+    series,
   });
 }
 

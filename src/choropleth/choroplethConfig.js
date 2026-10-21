@@ -1,5 +1,5 @@
 // ============================================================
-// FIELD CHOROPLETH (DEMO) CONFIGURATION
+// CHOROPLETH CONFIGURATION (fields and counties)
 // ============================================================
 //
 // Table URL, column names, variable labels and the field-ID
@@ -35,17 +35,76 @@ export const CHOROPLETH_CONFIG = {
 
 
   // ----------------------------------------------------------
+  // WHAT IS MAPPED
+  // ----------------------------------------------------------
+  //
+  // Only these time scales are offered. Each date is shown as its
+  // change from the historical norm for the same time of year,
+  // which comes from the table's "historical <period>" rows
+  // (e.g. "historical monthly"; see fieldReportConfig.js,
+  // historicalPrefix). A variable without historical rows for the
+  // period cannot be mapped, so it is not offered.
+  //
+
+  periods: ["monthly"],
+
+
+  // ----------------------------------------------------------
+  // COUNTIES
+  // ----------------------------------------------------------
+  //
+  // "Visualize counties" shades every county of the chosen state
+  // from the county statistics table (config.js, reports).
+  //
+
+  county: {
+
+    // Column names in the county statistics table.
+    columns: {
+      id:       "GEOID",
+      start:    "START",
+      period:   "PERIOD",
+      variable: "VARIABLE",
+      value:    "VALUE",
+    },
+
+    // Simplifies county outlines (map units, metres on the default
+    // basemap). Counties are large, so this can be generous.
+    maxAllowableOffset: 250,
+  },
+
+
+  // ----------------------------------------------------------
   // COLOURS
   // ----------------------------------------------------------
+  //
+  // Red = below the historical norm, green = above it. The scale
+  // is symmetric around "no change".
+  //
 
-  // Number of colour classes (quantiles: roughly equal numbers
-  // of fields per class).
-  classes: 5,
+  // Low -> normal -> high. Colours are blended between these.
+  divergingRamp: [
+    "#a50026", "#d73027", "#f46d43", "#fdae61", "#fee08b",
+    "#ffffbf",
+    "#d9ef8b", "#a6d96a", "#66bd63", "#1a9850", "#006837",
+  ],
 
-  // Light -> dark. Needs at least `classes` colours.
-  ramp: ["#ffffcc", "#a1dab4", "#41b6c4", "#2c7fb8", "#253494"],
+  // Distinct colours used across the scale (shared symbols keep
+  // drawing fast). Odd, so "no change" has a colour of its own.
+  colorSteps: 21,
 
-  // Fields with no value for the chosen variable/date.
+  // How far from the norm the scale reaches full red / full green,
+  // in the variable's own units (°F, in, ...). Variables not listed
+  // use the 95th percentile of what is on screen, rounded to a tidy
+  // number, so one extreme field cannot wash out the rest. Setting
+  // a value keeps the colours comparable from date to date:
+  //
+  //   changeRange: { tmean: 10, ppt: 2 },
+  //
+  // Keys are VARIABLE values in lower case.
+  changeRange: {},
+
+  // Fields / counties with no value or no norm for the chosen date.
   noDataColor: [150, 150, 150, 0.35],
 
   outlineColor: [255, 255, 255, 0.5],

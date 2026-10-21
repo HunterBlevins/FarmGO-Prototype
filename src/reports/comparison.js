@@ -12,8 +12,10 @@ import { clamp } from "../utils.js";
 //   Last week       the record 7 days before "Now"
 //   Last month      the record 1 calendar month before
 //   Last year       the record 1 calendar year before
-//   Historical norm the average of the records at the same time
-//                   of year in every earlier year in the table
+//   Historical norm the historical average for this time of year
+//                   (the table's "historical ..." rows). Without
+//                   those, the average of the same time of year in
+//                   every earlier year of the series
 //
 // A comparison record only counts if it falls close enough to the
 // target date (see matchTolerance), so weekly data is never
@@ -102,13 +104,17 @@ export function groupRecords(records, period) {
 //     base,                  value compared against (or null)
 //     baseTime,              its date (null for the norm)
 //     samples,               how many records `base` is built from
+//     normSource,            norm only: "historical" or "series"
 //     delta,                 now - base (or null)
 //     direction,             -1 lower, 0 same / unknown, +1 higher
 //     strength,              0 - 1, how big the change is
 //   }
 //
+// `historical` is the series from buildHistoricalSeries
+// (historical.js): the historical average at each date of `points`.
+//
 
-export function compareSeries(points, comparison) {
+export function compareSeries(points, comparison, historical = []) {
 
   if (points.length === 0) {
     return null;
@@ -120,14 +126,20 @@ export function compareSeries(points, comparison) {
   let base = null;
   let baseTime = null;
   let samples = 0;
+  let normSource = null;
 
   if (comparison.id === "norm") {
 
-    const norm = historicalNorm(points, latest, step);
+    const recorded = historical.find((row) => row.START === latest.time);
+
+    const norm = recorded
+      ? { value: recorded.VALUE, samples: recorded.SAMPLES ?? 1 }
+      : historicalNorm(points, latest, step);
 
     if (norm) {
       base = norm.value;
       samples = norm.samples;
+      normSource = recorded ? "historical" : "series";
     }
 
   } else {
@@ -159,6 +171,7 @@ export function compareSeries(points, comparison) {
     base,
     baseTime,
     samples,
+    normSource,
     delta,
     direction: delta === null ? 0 : Math.sign(delta),
     strength: changeStrength(delta, points),
@@ -167,18 +180,13 @@ export function compareSeries(points, comparison) {
 
 
 // ============================================================
-// HISTORICAL NORM  (PLACEHOLDER)
+// HISTORICAL NORM  (FALLBACK)
 // ============================================================
 //
-// For now the "norm" is worked out from the table itself: the
+// Used only when the table has no "historical ..." rows for the
+// variable. The norm is then worked out from the series itself: the
 // average of the records at the same time of year in every earlier
 // year the table covers. That is only as good as the years on file.
-//
-// When the table gets a real historical-norm field, replace the
-// body of this function with a lookup of that value for `latest`
-// (and return { value, samples: 1 }). Nothing else needs to change:
-// the tab, colours, tooltip and "Historical norm" label all read
-// from what this returns.
 //
 // Returns { value, samples } or null when there is nothing to
 // compare with.

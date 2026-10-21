@@ -23,6 +23,7 @@ import {
 } from "./ui.js";
 
 import { loadFieldReport, clearFieldReport } from "./fieldReports/fieldReport.js";
+import { applyRandomSymbology } from "./fieldSymbology.js";
 
 
 // ============================================================
@@ -106,7 +107,10 @@ export function loadFieldsForState(stateKey) {
     appState.map.add(layer);
 
     layer.load().then(
-      () => useLightOutFields(config.id, layer),
+      () => {
+        useLightOutFields(config.id, layer);
+        applyRandomSymbology(layer); // fields get varied colours by default
+      },
       (error) => {
         console.error(`Field layer failed to load: ${config.title}`, error);
       }

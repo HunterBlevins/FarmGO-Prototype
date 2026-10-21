@@ -12,7 +12,7 @@ import { escapeHtml, clamp } from "../utils.js";
 //
 
 const CHART_HEIGHT = 280;
-const MARGIN = { top: 14, right: 16, bottom: 34, left: 52 };
+const MARGIN = { top: 14, right: 16, bottom: 34, left: 62 };
 const MIN_WIDTH = 260;
 const CARD_PADDING = 38; // card padding + border, in px
 const Y_GRID_LINES = 5;
@@ -20,6 +20,10 @@ const MAX_VISIBLE_POINTS = 60;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const DEFAULT_COLOR = "#2563eb";
+
+// Reference lines (historical average, county) are drawn behind the
+// main line and slightly see-through, so the main line stays the focus.
+const REFERENCE_OPACITY = 0.55;
 
 const TEMPERATURE_SERIES = [
   { key: "tmin", name: "Minimum", color: "#2563eb" },
@@ -40,6 +44,7 @@ export function createTimeSeriesChart(container, data, options = {}) {
     title: options.title ?? "Time Series",
     subtitle: options.yAxisLabel ?? "",
     unit: options.valueSuffix ?? "",
+    axisLabel: options.axisLabel ?? "",
     series: [{
       name: options.title ?? "",
       color: options.color ?? DEFAULT_COLOR,
@@ -58,7 +63,8 @@ export function createTemperatureChart(container, climate) {
   createLineChart(container, {
     title: "Temperature",
     subtitle: "Minimum, mean, and maximum temperature",
-    unit: "°",
+    unit: "°F",
+    axisLabel: "Degrees Fahrenheit (°F)",
     emptyMessage: "No temperature data available.",
     showLegend: true,
     series: TEMPERATURE_SERIES.map(({ key, name, color }) => ({
@@ -75,9 +81,18 @@ export function createTemperatureChart(container, climate) {
 // ============================================================
 //
 // config = {
-//   title, subtitle, unit, emptyMessage, showLegend,
-//   series: [{ name, color, records: [{ START, VALUE }] }]
+//   title, subtitle, emptyMessage, showLegend,
+//   unit,        appended to values in the hover text ("°F")
+//   axisLabel,   y-axis title ("Degrees Fahrenheit (°F)")
+//   series: [{
+//     name, color, records: [{ START, VALUE }],
+//     reference,   true = a context line: drawn first, semi-transparent,
+//                  hover-only points (historical average, county)
+//     dashed,      dashed line
+//   }]
 // }
+//
+// The legend appears whenever there is more than one series.
 //
 
 export function createLineChart(container, config) {
@@ -98,11 +113,13 @@ function drawChart(container, config) {
     title,
     subtitle = "",
     unit = "",
+    axisLabel = "",
     emptyMessage = "No data available.",
-    showLegend = false,
   } = config;
 
   const series = prepareSeries(config.series);
+
+  const showLegend = config.showLegend || series.length > 1;
 
   if (series.length === 0) {
 
@@ -190,7 +207,7 @@ function drawChart(container, config) {
             class="chart-grid-line" />
       <text x="${MARGIN.left - 8}" y="${lineY + 4}"
             class="chart-axis-label" text-anchor="end">
-        ${formatNumber(value, axisDecimals)}${escapeHtml(unit)}
+        ${formatNumber(value, axisDecimals)}
       </text>
     `;
   }
@@ -232,17 +249,27 @@ function drawChart(container, config) {
   let lines = "";
   let points = "";
 
-  for (const s of series) {
+  // Reference lines first, so the main line is drawn on top of them.
+  const drawOrder = [
+    ...series.filter((s) => s.reference),
+    ...series.filter((s) => !s.reference),
+  ];
+
+  for (const s of drawOrder) {
 
     const color = escapeHtml(s.color);
+    const opacity = s.reference ? REFERENCE_OPACITY : 1;
 
     lines += `
-      <polyline class="chart-line" style="color:${color}"
+      <polyline class="chart-line"
+        style="color:${color}; opacity:${opacity}"
+        ${s.dashed ? 'stroke-dasharray="6 4"' : ""}
         points="${s.points.map((p) => `${x(p.time)},${y(p.value)}`).join(" ")}" />
     `;
 
-    // Dense series get invisible hover targets instead of dots.
-    const visible = s.points.length <= MAX_VISIBLE_POINTS;
+    // Dense series, and reference lines, get invisible hover
+    // targets instead of dots.
+    const visible = !s.reference && s.points.length <= MAX_VISIBLE_POINTS;
 
     for (const p of s.points) {
 
@@ -258,6 +285,21 @@ function drawChart(container, config) {
       `;
     }
   }
+
+  // ----------------------------------------------------------
+  // Y AXIS TITLE (rotated, at the left edge)
+  // ----------------------------------------------------------
+
+  const titleX = 13;
+  const titleY = MARGIN.top + plotHeight / 2;
+
+  const yTitle = axisLabel
+    ? `<text x="${titleX}" y="${titleY}"
+             class="chart-axis-label" text-anchor="middle"
+             transform="rotate(-90 ${titleX} ${titleY})">
+         ${escapeHtml(axisLabel)}
+       </text>`
+    : "";
 
   // ----------------------------------------------------------
   // RENDER
@@ -292,6 +334,7 @@ function drawChart(container, config) {
           <line x1="${MARGIN.left}" y1="${MARGIN.top + plotHeight}"
                 x2="${MARGIN.left + plotWidth}" y2="${MARGIN.top + plotHeight}"
                 class="chart-axis" />
+          ${yTitle}
           ${lines}
           ${points}
           ${xLabels}

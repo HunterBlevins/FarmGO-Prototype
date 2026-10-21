@@ -1,6 +1,5 @@
 import "./choropleth.css";
 
-import { appState } from "../state.js";
 import { escapeHtml, createLatestGuard } from "../utils.js";
 import { CHOROPLETH_CONFIG as CONFIG } from "./choroplethConfig.js";
 
@@ -12,47 +11,47 @@ import {
 } from "../reports/variables.js";
 
 import {
-  getStatisticsTableUrl,
-  getCountyOptions,
-  getCountyFieldShapes,
-  getFieldValues,
-} from "./choroplethData.js";
-
-import {
   drawChoropleth,
   clearChoropleth,
   setChoroplethOpacity,
-  legendHtml,
 } from "./choroplethRenderer.js";
 
 import {
-  onFieldContextChange,
-  setActiveFieldLayerVisible,
-} from "../fields.js";
+  computeChanges,
+  buildScale,
+  legendHtml,
+} from "./choroplethScale.js";
+
+import { SOURCES, getSourceElements } from "./choroplethSources.js";
+import { onFieldContextChange } from "../fields.js";
 
 
 // ============================================================
 // VISUALIZE BY VARIABLES
 // ============================================================
 //
-// The "Visualize by variables" button sits under the Field Layer
-// dropdown. Clicking it swaps the field boundaries for the same
-// fields shaded by one variable on one date, and shows the
-// variable, time scale and date slider. Clicking it again goes
-// back to the boundaries.
+// Under the Field Layer dropdown there is one button per thing
+// that can be shaded:
 //
-// Only one of the two is ever on the map: the field layer is
-// hidden when the shaded fields appear and shown again when they
-// go.
+//   Visualize fields     the chosen county's fields
+//   Visualize counties   every county of the chosen state
+//
+// Turning one on shows the variable, time scale and date slider;
+// turning it off (or turning the other on) goes back. Only one is
+// ever on. What each one needs and where its data comes from is
+// described in choroplethSources.js.
+//
+// Each shape is coloured by how far the chosen date is from the
+// historical norm for the same time of year: red below, green above
+// (see choroplethScale.js).
 //
 
-const BUTTON_LABEL = "Visualize by variables";
 const BUTTON_LABEL_ACTIVE = "Stop visualizing";
 
 const state = {
-  enabled: false,
-  countyId: "",
-  options: null,   // Map< variable -> Map< period -> times[] > >
+  source: null,    // the source that is on, or null
+  scope: "",       // its county / state id
+  options: null,   // Map< variable -> Map< period -> { times, historicalPeriod } > >
   variable: "",
   period: "",
   times: [],
@@ -71,16 +70,19 @@ const byId = (id) => document.getElementById(id);
 
 export function initializeChoropleth() {
 
-  const button = byId("visualizeButton");
+  const buttons = SOURCES.map((source) => getSourceElements(source).button);
 
-  if (!button) {
-    console.warn("visualizeButton not found; visualization disabled.");
+  if (buttons.some((button) => !button)) {
+    console.warn("A visualize button was not found; visualization disabled.");
     return;
   }
 
-  button.addEventListener("click", () =>
-    state.enabled ? turnOff() : turnOn()
-  );
+  for (const source of SOURCES) {
+
+    getSourceElements(source).button.addEventListener("click", () =>
+      state.source === source ? turnOff() : turnOn(source)
+    );
+  }
 
   byId("visualizeVariable").addEventListener("change", (event) =>
     selectVariable(event.target.value)
@@ -101,11 +103,15 @@ export function initializeChoropleth() {
 
   dateSlider.addEventListener("change", render);
 
-  // The shaded fields belong to one county + one field layer.
-  // When either changes, drop them (the field code has already
-  // put the right layer back on the map).
+  // The state, county or field layer changed. Whatever is on may
+  // no longer apply (the field code has already put the right
+  // layer back on the map).
   onFieldContextChange(() => {
-    deactivate();
+
+    if (state.source && !state.source.keepsOnContextChange(state.scope)) {
+      deactivate();
+    }
+
     refreshAvailability();
   });
 
@@ -119,23 +125,26 @@ export function initializeChoropleth() {
 
 function refreshAvailability() {
 
-  const button = byId("visualizeButton");
+  for (const source of SOURCES) {
 
-  if (!button || state.enabled) {
-    return;
+    const { button, hint } = getSourceElements(source);
+
+    if (!button || state.source === source) {
+      continue;
+    }
+
+    const message = source.unavailableHint();
+
+    button.disabled = Boolean(message);
+
+    if (hint) {
+      hint.textContent = message;
+    }
   }
 
-  let hint = "";
-
-  if (!appState.selectedCounty) {
-    hint = "Select a county to use this.";
-  } else if (!appState.activeFieldLayer) {
-    hint = "Choose a field layer to use this.";
+  if (!state.source) {
+    setStatus("");
   }
-
-  button.disabled = Boolean(hint);
-
-  setStatus(hint);
 }
 
 function setStatus(message, isError = false) {
@@ -153,29 +162,30 @@ function setStatus(message, isError = false) {
 // TURN ON / OFF
 // ============================================================
 
-async function turnOn() {
+async function turnOn(source) {
 
-  const countyId = appState.selectedCounty?.id;
-
-  if (!countyId || !appState.activeFieldLayer) {
-    return;
+  // Switching from one to the other.
+  if (state.source) {
+    turnOff();
   }
 
-  if (!getStatisticsTableUrl()) {
-    return abort(
-      "The field statistics table is not configured " +
-      "(see fieldReportConfig.js).",
-      true
-    );
+  if (source.unavailableHint()) {
+    return refreshAvailability();
   }
 
-  state.enabled = true;
-  state.countyId = countyId;
+  const scope = source.scope();
 
-  const button = byId("visualizeButton");
+  state.source = source;
+  state.scope = scope;
+
+  const { button, hint } = getSourceElements(source);
 
   button.textContent = BUTTON_LABEL_ACTIVE;
   button.setAttribute("aria-pressed", "true");
+
+  if (hint) {
+    hint.textContent = "";
+  }
 
   byId("visualizeControls").hidden = true;
   setStatus("Loading available variables…");
@@ -184,14 +194,14 @@ async function turnOn() {
 
   try {
 
-    const options = await getCountyOptions(countyId);
+    const options = await source.getOptions(scope);
 
     if (!isCurrent()) {
       return;
     }
 
     if (!options) {
-      return abort("No statistics were found for fields in this county.");
+      return abort(source.noOptionsMessage);
     }
 
     state.options = options;
@@ -210,12 +220,14 @@ async function turnOn() {
   }
 }
 
-/** The user switched it off: the field boundaries come back. */
+/** The user switched it off: the map goes back to how it was. */
 function turnOff() {
+
+  const source = state.source;
 
   deactivate();
 
-  setActiveFieldLayerVisible(true);
+  source?.onReleased?.();
 
   refreshAvailability();
 }
@@ -231,23 +243,29 @@ function abort(message, isError = false) {
 }
 
 /**
- * Removes the shaded fields and resets the controls. Does NOT touch
- * the field layer: whoever calls this decides what is drawn next.
+ * Removes the shading and resets the controls. Does NOT put back
+ * what the visualization replaced: whoever calls this decides what
+ * is drawn next.
  */
 function deactivate() {
 
   guard.cancel();
 
-  state.enabled = false;
+  const source = state.source;
+
+  state.source = null;
+  state.scope = "";
   state.options = null;
 
-  appState.visualizing = false;
+  if (source) {
 
-  const button = byId("visualizeButton");
+    const { button } = getSourceElements(source);
 
-  if (button) {
-    button.textContent = BUTTON_LABEL;
+    button.textContent = source.label;
     button.setAttribute("aria-pressed", "false");
+
+    clearChoropleth(source.id);
+    source.onCleared?.();
   }
 
   const controls = byId("visualizeControls");
@@ -257,8 +275,6 @@ function deactivate() {
   }
 
   byId("visualizeLegend")?.replaceChildren();
-
-  clearChoropleth();
 }
 
 
@@ -308,7 +324,7 @@ function selectPeriod(period) {
 
   byId("visualizePeriod").value = period;
 
-  state.times = state.options.get(state.variable).get(period);
+  state.times = state.options.get(state.variable).get(period).times;
 
   // Start on the most recent date.
   state.timeIndex = state.times.length - 1;
@@ -341,70 +357,91 @@ function updateDateLabel() {
 
 async function render() {
 
-  if (!state.enabled) {
+  const { source, scope } = state;
+
+  if (!source) {
     return;
   }
 
   const isCurrent = guard.next();
 
-  const { countyId, variable, period } = state;
+  const { variable, period } = state;
   const time = state.times[state.timeIndex];
+  const { historicalPeriod } = state.options.get(variable).get(period);
 
-  setStatus("Loading fields…");
+  const choice = { variable, period, historicalPeriod, time };
+
+  setStatus(`Loading ${source.noun}…`);
 
   try {
 
-    // Shapes are cached per county, so moving the date slider
-    // only re-queries the values.
-    const [{ shapes, truncated }, values] = await Promise.all([
-      getCountyFieldShapes(countyId),
-      getFieldValues({ countyId, variable, period, time }),
+    // Shapes and norms are cached (per scope / per month of the
+    // year), so moving the date slider mostly re-queries one
+    // number per field or county.
+    const [{ shapes, truncated }, values, norms] = await Promise.all([
+      source.getShapes(scope),
+      source.getValues(scope, choice),
+      source.getNorms(scope, choice),
     ]);
 
-    if (!isCurrent() || !state.enabled) {
+    if (!isCurrent() || state.source !== source) {
       return;
     }
 
-    const { scheme, matched, total } = drawChoropleth(shapes, values);
+    const changes = computeChanges(values, norms);
+    const scale = buildScale(changes, variable);
+
+    const { matched, total } = drawChoropleth(source.id, shapes, changes, scale);
 
     // The one transparency slider controls whatever is drawn.
-    setChoroplethOpacity(appState.activeFieldLayer?.opacity ?? CONFIG.opacity);
+    setChoroplethOpacity(currentOpacity());
 
-    if (!appState.visualizing) {
+    source.onDrawn?.();
 
-      // First draw: swap the field boundaries for the shaded
-      // fields, so only one of them is on the map.
-      appState.visualizing = true;
-      setActiveFieldLayerVisible(false);
-    }
+    byId("visualizeLegend").innerHTML = legendHtml(scale, {
+      unit: describeVariable(variable).unit,
+      normLabel: `${monthName(time)} norm`,
+    });
 
-    byId("visualizeLegend").innerHTML = legendHtml(
-      scheme,
-      describeVariable(variable).unit
-    );
-
-    let message = `${total.toLocaleString()} fields, ${matched.toLocaleString()} with data.`;
-
-    if (truncated) {
-      message += ` Showing the first ${CONFIG.maxFeatures.toLocaleString()} only.`;
-    }
-
-    if (total === 0) {
-      message = "No field shapes were found for this county.";
-    } else if (matched === 0) {
-      message += " Check that FIELD_ID values match the map layer's IDs.";
-    }
-
-    setStatus(message);
+    setStatus(statusMessage({ source, shapes, total, matched, norms, truncated }));
 
   } catch (error) {
 
     console.error("Visualization failed:", error);
 
     if (isCurrent()) {
-      setStatus(`Could not visualize the fields: ${error.message}`, true);
+      setStatus(`Could not visualize the ${source.noun}: ${error.message}`, true);
     }
   }
+}
+
+function statusMessage({ source, total, matched, norms, truncated }) {
+
+  if (total === 0) {
+    return `No ${source.noun} shapes were found.`;
+  }
+
+  let message = `${total.toLocaleString()} ${source.noun}, ${matched.toLocaleString()} with data.`;
+
+  if (truncated) {
+    message += ` Showing the first ${CONFIG.maxFeatures.toLocaleString()} only.`;
+  }
+
+  if (matched === 0) {
+    message += norms.size === 0
+      ? " No historical norm was found for this variable and month."
+      : ` ${source.idHint}`;
+  }
+
+  return message;
+}
+
+/** The transparency slider's setting as an opacity (0 - 1). */
+function currentOpacity() {
+
+  const slider = byId("fieldOpacitySlider");
+
+  return slider ? 1 - Number(slider.value) / 100 : CONFIG.opacity;
 }
 
 
@@ -412,13 +449,23 @@ async function render() {
 // FORMATTING
 // ============================================================
 
-/** Dates are stored in UTC; show them as stored. */
+/** Dates are stored in UTC; show them as stored. Monthly: "Mar 2026". */
 function formatDate(ms) {
+
+  const monthly = state.period.trim().toLowerCase() === "monthly";
 
   return new Date(ms).toLocaleDateString("en-US", {
     month: "short",
-    day: "numeric",
+    ...(monthly ? {} : { day: "numeric" }),
     year: "numeric",
+    timeZone: "UTC",
+  });
+}
+
+function monthName(ms) {
+
+  return new Date(ms).toLocaleDateString("en-US", {
+    month: "long",
     timeZone: "UTC",
   });
 }

@@ -76,7 +76,12 @@ export async function loadCountyReport(countyId, countyName, stateName) {
       </div>
     `;
 
-    renderComparisonReport(container, { headerHtml, records, ui });
+    renderComparisonReport(container, {
+      headerHtml,
+      records,
+      ui,
+      seriesName: "County",
+    });
 
   } catch (error) {
 

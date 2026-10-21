@@ -3,51 +3,60 @@ import Graphic from "@arcgis/core/Graphic.js";
 import SimpleFillSymbol from "@arcgis/core/symbols/SimpleFillSymbol.js";
 
 import { appState } from "../state.js";
-import { clamp, escapeHtml } from "../utils.js";
+import { clamp } from "../utils.js";
 import { CHOROPLETH_CONFIG as CONFIG } from "./choroplethConfig.js";
 
 
 // ============================================================
-// THE MAP LAYER
+// THE MAP LAYERS
 // ============================================================
 //
-// A plain GraphicsLayer owned by this file. It is added to the
-// map when something is drawn and removed again when cleared,
-// so nothing else in the app is affected.
+// One plain GraphicsLayer per kind of choropleth ("fields",
+// "counties"), owned by this file. A layer is added to the map when
+// something is drawn and removed again when cleared, so nothing
+// else in the app is affected.
+//
+// Counties sit at the bottom of the map (above the basemap), as a
+// thematic backdrop: field layers, rasters and the state / county
+// outlines stay visible on top of them. Fields sit on top.
 //
 
-let layer = null;
+const layers = new Map(); // level -> GraphicsLayer
 
-function getLayer() {
+function getLayer(level) {
 
-  if (!layer) {
+  if (!layers.has(level)) {
 
-    layer = new GraphicsLayer({
-      title: "Field choropleth",
+    layers.set(level, new GraphicsLayer({
+      title: `${level} choropleth`,
       opacity: CONFIG.opacity,
       listMode: "hide",
-    });
+    }));
   }
 
+  const layer = layers.get(level);
   const map = appState.map;
 
   if (!map.layers.includes(layer)) {
     map.add(layer);
   }
 
-  // Keep it above layers that were added later.
-  map.reorder(layer, map.layers.length - 1);
+  map.reorder(layer, level === "counties" ? 0 : map.layers.length - 1);
 
   return layer;
 }
 
-/** The layer the shapes are drawn on, or null if nothing is drawn. */
+/** The layer the field shapes are drawn on, or null if none is drawn. */
 export function getChoroplethLayer() {
+
+  const layer = layers.get("fields");
 
   return layer && appState.map.layers.includes(layer) ? layer : null;
 }
 
-export function clearChoropleth() {
+export function clearChoropleth(level) {
+
+  const layer = layers.get(level);
 
   if (!layer) {
     return;
@@ -58,59 +67,14 @@ export function clearChoropleth() {
   appState.map.remove(layer);
 }
 
+/** Applies to every choropleth layer (only one is ever drawn). */
 export function setChoroplethOpacity(opacity) {
 
-  if (layer) {
-    layer.opacity = clamp(Number(opacity), 0, 1);
+  const value = clamp(Number(opacity), 0, 1);
+
+  for (const layer of layers.values()) {
+    layer.opacity = value;
   }
-}
-
-
-// ============================================================
-// CLASSIFICATION (quantiles)
-// ============================================================
-//
-// Returns { min, uppers } where uppers[i] is the highest value
-// in class i, or null if there are no values. Duplicate
-// thresholds are merged, so there can be fewer classes than
-// requested.
-//
-
-export function classify(values, classes = CONFIG.classes) {
-
-  const sorted = values.filter(Number.isFinite).sort((a, b) => a - b);
-
-  if (sorted.length === 0) {
-    return null;
-  }
-
-  const uppers = [];
-
-  for (let i = 1; i <= classes; i++) {
-
-    const value = sorted[Math.ceil((i * sorted.length) / classes) - 1];
-
-    if (uppers.length === 0 || value > uppers[uppers.length - 1]) {
-      uppers.push(value);
-    }
-  }
-
-  return { min: sorted[0], uppers };
-}
-
-function classIndex(scheme, value) {
-
-  return scheme.uppers.findIndex((upper) => value <= upper);
-}
-
-/** Picks colour number `i` of `count` from the ramp. */
-export function colorFor(i, count) {
-
-  const ramp = CONFIG.ramp;
-
-  return count === 1
-    ? ramp[Math.floor((ramp.length - 1) / 2)]
-    : ramp[Math.round((i * (ramp.length - 1)) / (count - 1))];
 }
 
 
@@ -118,9 +82,11 @@ export function colorFor(i, count) {
 // DRAW
 // ============================================================
 //
-// shapes: [{ id, geometry }]     values: Map(id -> number)
+// shapes:  [{ id, geometry }]
+// changes: Map(id -> change from the norm)
+// scale:   from buildScale (choroplethScale.js)
 //
-// Returns { scheme, matched, total } for the legend and status.
+// Returns { matched, total } for the status line.
 //
 
 function fillSymbol(color) {
@@ -131,101 +97,37 @@ function fillSymbol(color) {
   });
 }
 
-export function drawChoropleth(shapes, values) {
+export function drawChoropleth(level, shapes, changes, scale) {
 
-  const target = getLayer();
+  const target = getLayer(level);
 
-  const present = shapes
-    .map((shape) => values.get(shape.id))
-    .filter((value) => value !== undefined);
-
-  const scheme = classify(present);
-
-  // One symbol per class, shared by every graphic in that class.
-  const symbols = scheme
-    ? scheme.uppers.map((_, i) => fillSymbol(colorFor(i, scheme.uppers.length)))
-    : [];
-
+  // One symbol per colour step, shared by every graphic with that
+  // colour (graphics are given their symbol before they are added,
+  // which is much faster than changing them while on the map).
+  const symbols = scale.colors.map((color) => fillSymbol(color));
   const noDataSymbol = fillSymbol(CONFIG.noDataColor);
+
+  let matched = 0;
 
   const graphics = shapes.map((shape) => {
 
-    const value = values.get(shape.id);
+    const change = changes.get(shape.id);
+
+    if (change !== undefined) {
+      matched++;
+    }
 
     return new Graphic({
       geometry: shape.geometry,
-      symbol: value === undefined
+      symbol: change === undefined
         ? noDataSymbol
-        : symbols[classIndex(scheme, value)],
-      attributes: { id: shape.id, value: value ?? null },
+        : symbols[scale.indexFor(change)],
+      attributes: { id: shape.id, change: change ?? null },
     });
   });
 
-  // Swap everything in one go (graphics are given their symbol
-  // before they are added, which is much faster than changing
-  // them while they are on the map).
   target.removeAll();
   target.addMany(graphics);
 
-  return { scheme, matched: present.length, total: shapes.length };
-}
-
-
-// ============================================================
-// LEGEND
-// ============================================================
-
-/** Same number of decimals for every legend entry, based on the data range. */
-function decimalsFor(span) {
-
-  return span >= 100 ? 0 : span >= 10 ? 1 : span >= 1 ? 2 : 3;
-}
-
-export function formatValue(value, decimals = 2) {
-
-  return value.toFixed(decimals);
-}
-
-function cssColor(color) {
-
-  return Array.isArray(color)
-    ? `rgba(${color[0]}, ${color[1]}, ${color[2]}, ${color[3] ?? 1})`
-    : color;
-}
-
-export function legendHtml(scheme, unit = "") {
-
-  if (!scheme) {
-    return "";
-  }
-
-  const max = scheme.uppers[scheme.uppers.length - 1];
-  const decimals = decimalsFor(max - scheme.min);
-
-  const rows = scheme.uppers.map((upper, i) => {
-
-    const lower = i === 0 ? scheme.min : scheme.uppers[i - 1];
-
-    const text =
-      lower === upper
-        ? `${formatValue(upper, decimals)}${unit}`
-        : `${formatValue(lower, decimals)} – ${formatValue(upper, decimals)}${unit}`;
-
-    return legendRow(colorFor(i, scheme.uppers.length), text);
-  });
-
-  rows.push(legendRow(CONFIG.noDataColor, "No data"));
-
-  return rows.join("");
-}
-
-function legendRow(color, text) {
-
-  return `
-    <div class="choropleth-legend-item">
-      <span class="choropleth-swatch"
-            style="background:${cssColor(color)}"></span>
-      <span>${escapeHtml(text)}</span>
-    </div>
-  `;
+  return { matched, total: shapes.length };
 }

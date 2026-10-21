@@ -44,6 +44,18 @@ export function describeVariable(raw) {
   return { label: prettify(String(raw)), unit: "", higherIsBetter: true };
 }
 
+/**
+ * Y-axis title for a variable's chart, e.g. "Degrees Fahrenheit (°F)".
+ * Variables without a unit (NDVI) are titled by their label.
+ */
+export function axisLabelFor(raw) {
+
+  const info = describeVariable(raw);
+  const unit = info.unit.trim();
+
+  return unit ? (TABLE.unitNames?.[unit] ?? unit) : info.label;
+}
+
 /** Order variables like TABLE.variableOrder, then alphabetically. */
 export function sortVariables(names) {
 
